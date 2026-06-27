@@ -97,6 +97,76 @@ export default async function AdminDashboardPage() {
     orderBy: { createdAt: "desc" },
   });
 
+  // 6. Compute 30-Day Reports Suite
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const pastTransactions = await prisma.walletTransaction.findMany({
+    where: { timestamp: { gte: thirtyDaysAgo } },
+    select: { source: true, changeAmount: true, timestamp: true },
+  });
+
+  const revenueByDayMap: Record<string, number> = {};
+  const collectionByDayMap: Record<string, number> = {};
+
+  pastTransactions.forEach((tx) => {
+    const day = new Date(tx.timestamp).toISOString().split("T")[0];
+    if (tx.source === "DELIVERY_DEDUCTION") {
+      revenueByDayMap[day] = (revenueByDayMap[day] || 0) + Math.abs(tx.changeAmount);
+    } else if (tx.source === "RECHARGE") {
+      collectionByDayMap[day] = (collectionByDayMap[day] || 0) + tx.changeAmount;
+    }
+  });
+
+  const revenueReport = Object.entries(revenueByDayMap)
+    .map(([date, total]) => ({ date, total }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  const collectionReport = Object.entries(collectionByDayMap)
+    .map(([date, total]) => ({ date, total }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  const pastCustomers = await prisma.user.findMany({
+    where: { role: "CUSTOMER", createdAt: { gte: thirtyDaysAgo } },
+    select: { createdAt: true },
+  });
+
+  const customerGrowthMap: Record<string, number> = {};
+  pastCustomers.forEach((c) => {
+    const day = new Date(c.createdAt).toISOString().split("T")[0];
+    customerGrowthMap[day] = (customerGrowthMap[day] || 0) + 1;
+  });
+
+  const customerGrowthReport = Object.entries(customerGrowthMap)
+    .map(([date, count]) => ({ date, count }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  const pastDeliveries = await prisma.delivery.findMany({
+    where: { deliveredAt: { gte: thirtyDaysAgo } },
+    select: { status: true, deliveredAt: true },
+  });
+
+  const deliveryPerfMap: Record<string, { delivered: number; issueReported: number }> = {};
+  pastDeliveries.forEach((d) => {
+    const day = new Date(d.deliveredAt).toISOString().split("T")[0];
+    if (!deliveryPerfMap[day]) {
+      deliveryPerfMap[day] = { delivered: 0, issueReported: 0 };
+    }
+    if (d.status === "DELIVERED") deliveryPerfMap[day].delivered += 1;
+    else if (d.status === "ISSUE_REPORTED") deliveryPerfMap[day].issueReported += 1;
+  });
+
+  const deliveryPerformanceReport = Object.entries(deliveryPerfMap)
+    .map(([date, data]) => ({ date, ...data }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  const reports = {
+    revenue: revenueReport,
+    collection: collectionReport,
+    customerGrowth: customerGrowthReport,
+    deliveryPerformance: deliveryPerformanceReport,
+  };
+
   const stats = {
     totalCustomers,
     totalWalletBalance,
@@ -113,6 +183,7 @@ export default async function AdminDashboardPage() {
         products={products}
         recentTransactions={recentTransactions as any}
         allUsers={allUsers}
+        reports={reports}
       />
     </>
   );

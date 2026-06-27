@@ -439,17 +439,22 @@ export async function reportDeliveryIssue(
   }
 }
 
-// 10. Manager creates a new delivery route
-export async function createRoute(name: string, description?: string) {
+// 10. Manager / SubAdmin creates a new delivery route
+export async function createRoute(name: string, description?: string, subAdminId?: string) {
   try {
     const existing = await prisma.route.findUnique({ where: { name } });
     if (existing) return { success: false, error: "A route with this name already exists." };
 
     const route = await prisma.route.create({
-      data: { name, description: description || null },
+      data: {
+        name,
+        description: description || null,
+        subAdminId: subAdminId || null,
+      },
     });
 
     revalidatePath("/manager");
+    revalidatePath("/subadmin");
     return { success: true, route };
   } catch (err: any) {
     console.error("createRoute error:", err);

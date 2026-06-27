@@ -45,6 +45,21 @@ interface UserItem {
   createdAt: Date;
 }
 
+interface ReportItem {
+  date: string;
+  total?: number;
+  count?: number;
+  delivered?: number;
+  issueReported?: number;
+}
+
+interface ReportsSuite {
+  revenue: { date: string; total: number }[];
+  collection: { date: string; total: number }[];
+  customerGrowth: { date: string; count: number }[];
+  deliveryPerformance: { date: string; delivered: number; issueReported: number }[];
+}
+
 interface AdminDashboardProps {
   stats: {
     totalCustomers: number;
@@ -56,6 +71,7 @@ interface AdminDashboardProps {
   products: Product[];
   recentTransactions: TransactionItem[];
   allUsers: UserItem[];
+  reports?: ReportsSuite;
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -80,9 +96,10 @@ export function AdminDashboardClient({
   products,
   recentTransactions,
   allUsers,
+  reports = { revenue: [], collection: [], customerGrowth: [], deliveryPerformance: [] },
 }: AdminDashboardProps) {
   // User Management state
-  const [activeTab, setActiveTab] = useState<"dashboard" | "users">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "reports">("dashboard");
   const [showModal, setShowModal] = useState(false);
   const [formName, setFormName] = useState("");
   const [formEmail, setFormEmail] = useState("");
@@ -141,6 +158,12 @@ export function AdminDashboardClient({
         >
           👥 User Management
           <span className="tab-count">{allUsers.length}</span>
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "reports" ? "active" : ""}`}
+          onClick={() => setActiveTab("reports")}
+        >
+          📈 Reports Suite
         </button>
       </div>
 
@@ -339,6 +362,130 @@ export function AdminDashboardClient({
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── REPORTS SUITE TAB ─── */}
+      {activeTab === "reports" && (
+        <div className="dashboard-grid mt-4">
+          {/* Revenue Report Table */}
+          <div className="grid-column">
+            <div className="card">
+              <h3>💰 Daily Revenue Report (Last 30 Days)</h3>
+              <p className="text-muted mb-4">Total wallet deductions from completed daily deliveries.</p>
+              <div className="requests-table-wrapper">
+                {reports.revenue.length === 0 ? (
+                  <p className="text-muted text-center py-4">No delivery revenue recorded in the last 30 days.</p>
+                ) : (
+                  <table className="dashboard-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Total Revenue</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reports.revenue.map((row) => (
+                        <tr key={row.date}>
+                          <td>{row.date}</td>
+                          <td><strong style={{ color: "var(--green)" }}>₹{row.total.toFixed(2)}</strong></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+
+            {/* Customer Growth Report Table */}
+            <div className="card mt-4">
+              <h3>📈 Customer Growth Report (Last 30 Days)</h3>
+              <p className="text-muted mb-4">New customer account registrations per day.</p>
+              <div className="requests-table-wrapper">
+                {reports.customerGrowth.length === 0 ? (
+                  <p className="text-muted text-center py-4">No new registrations in the last 30 days.</p>
+                ) : (
+                  <table className="dashboard-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>New Customers</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reports.customerGrowth.map((row) => (
+                        <tr key={row.date}>
+                          <td>{row.date}</td>
+                          <td><span className="badge badge-info">+{row.count} Users</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column Reports */}
+          <div className="grid-column">
+            {/* Wallet Collection Report Table */}
+            <div className="card">
+              <h3>💳 Wallet Collection Report (Last 30 Days)</h3>
+              <p className="text-muted mb-4">Total verified prepaid wallet recharges collected per day.</p>
+              <div className="requests-table-wrapper">
+                {reports.collection.length === 0 ? (
+                  <p className="text-muted text-center py-4">No recharges collected in the last 30 days.</p>
+                ) : (
+                  <table className="dashboard-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Total Collection</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reports.collection.map((row) => (
+                        <tr key={row.date}>
+                          <td>{row.date}</td>
+                          <td><strong style={{ color: "var(--green)" }}>₹{row.total.toFixed(2)}</strong></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+
+            {/* Delivery Performance Report Table */}
+            <div className="card mt-4">
+              <h3>🚚 Delivery Performance Report (Last 30 Days)</h3>
+              <p className="text-muted mb-4">Successful deliveries vs reported logistics issues.</p>
+              <div className="requests-table-wrapper">
+                {reports.deliveryPerformance.length === 0 ? (
+                  <p className="text-muted text-center py-4">No delivery records logged in the last 30 days.</p>
+                ) : (
+                  <table className="dashboard-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Delivered ✓</th>
+                        <th>Issues Reported ⚠️</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reports.deliveryPerformance.map((row) => (
+                        <tr key={row.date}>
+                          <td>{row.date}</td>
+                          <td><span className="badge badge-success">{row.delivered}</span></td>
+                          <td><span className="badge badge-danger">{row.issueReported}</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
             </div>
           </div>
         </div>
