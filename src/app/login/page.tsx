@@ -142,15 +142,7 @@ function LoginForm() {
           </button>
         </form>
 
-        <div className="login-footer">
-          <p>Local testing credentials (Password: <code>*123</code>):</p>
-          <ul>
-            <li>Admin: <code>admin@bhagwati.com</code></li>
-            <li>Manager: <code>manager@bhagwati.com</code></li>
-            <li>Customer: <code>customer@bhagwati.com</code></li>
-            <li>Delivery: <code>delivery@bhagwati.com</code></li>
-          </ul>
-        </div>
+
       </div>
 
       <style jsx>{`
@@ -219,32 +211,7 @@ function LoginForm() {
           font-size: 15px;
           margin-top: 10px;
         }
-        .login-footer {
-          margin-top: 32px;
-          padding-top: 24px;
-          border-top: 1px dashed var(--border);
-          font-size: 12px;
-          color: var(--muted);
-        }
-        .login-footer p {
-          font-weight: 600;
-          margin-bottom: 8px;
-          color: var(--text);
-        }
-        .login-footer ul {
-          list-style: none;
-          padding-left: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-        }
-        .login-footer code {
-          background: var(--border-light);
-          padding: 2px 6px;
-          border-radius: 4px;
-          color: var(--green-dark);
-          font-family: monospace;
-        }
+
       `}</style>
     </div>
   );

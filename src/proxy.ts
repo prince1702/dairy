@@ -2,9 +2,15 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-const secret = process.env.NEXTAUTH_SECRET || "supersecretdevelopmentjwtsecretkey12345!";
 
 export async function proxy(req: NextRequest) {
+  if (!process.env.NEXTAUTH_SECRET) {
+    throw new Error(
+      "NEXTAUTH_SECRET environment variable is not set. Set it in your .env file and in Vercel project settings before running the app."
+    );
+  }
+
+  const secret = process.env.NEXTAUTH_SECRET;
   const { pathname } = req.nextUrl;
 
   // Paths requiring authentication

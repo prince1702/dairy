@@ -12,6 +12,12 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
+        if (!process.env.NEXTAUTH_SECRET) {
+          throw new Error(
+            "NEXTAUTH_SECRET environment variable is not set. Set it in your .env file and in Vercel project settings before running the app."
+          );
+        }
+
         if (!credentials?.email || !credentials?.password) {
           throw new Error("Invalid credentials");
         }
@@ -64,9 +70,12 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
   },
-  secret: process.env.NEXTAUTH_SECRET || "supersecretdevelopmentjwtsecretkey12345!",
+  // Falls back to undefined if not set; the authorize callback above throws
+  // a clear error at request time if NEXTAUTH_SECRET is missing.
+  secret: process.env.NEXTAUTH_SECRET,
 };
 
 const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };
+
