@@ -83,6 +83,20 @@ export default async function AdminDashboardPage() {
     take: 30,
   });
 
+  // 5. Fetch all users for User Management panel
+  const allUsers = await prisma.user.findMany({
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      status: true,
+      phone: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
   const stats = {
     totalCustomers,
     totalWalletBalance,
@@ -98,6 +112,7 @@ export default async function AdminDashboardPage() {
         forecast={forecast}
         products={products}
         recentTransactions={recentTransactions as any}
+        allUsers={allUsers}
       />
     </>
   );

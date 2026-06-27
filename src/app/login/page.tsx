@@ -13,9 +13,10 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
 
   const errorParam = searchParams.get("error");
-  const callbackUrl = searchParams.get("callbackUrl");
+  const registeredParam = searchParams.get("registered");
 
   useEffect(() => {
     if (errorParam === "CredentialsSignin") {
@@ -25,7 +26,10 @@ function LoginForm() {
     } else if (errorParam) {
       setErrorMsg("An error occurred during authentication.");
     }
-  }, [errorParam]);
+    if (registeredParam === "true") {
+      setSuccessMsg("Account created! Please sign in with your new credentials.");
+    }
+  }, [errorParam, registeredParam]);
 
   // Redirect if session is already active
   useEffect(() => {
@@ -108,6 +112,7 @@ function LoginForm() {
           <p className="subtitle">Sign in to manage your dairy dashboard</p>
         </div>
 
+        {successMsg && <div className="success-alert">{successMsg}</div>}
         {errorMsg && <div className="error-alert">{errorMsg}</div>}
 
         <form onSubmit={handleSubmit}>
@@ -142,6 +147,13 @@ function LoginForm() {
           </button>
         </form>
 
+
+        <div className="login-register-link">
+          <p>
+            Don&apos;t have an account?{" "}
+            <Link href="/register" className="link">Register</Link>
+          </p>
+        </div>
 
       </div>
 
@@ -211,6 +223,30 @@ function LoginForm() {
           font-size: 15px;
           margin-top: 10px;
         }
+        .success-alert {
+          background: #dcfce7;
+          border: 1px solid #86efac;
+          color: #166534;
+          padding: 12px 16px;
+          border-radius: var(--radius-sm);
+          font-size: 14px;
+          margin-bottom: 24px;
+          font-weight: 500;
+        }
+        .login-register-link {
+          text-align: center;
+          margin-top: 24px;
+          padding-top: 20px;
+          border-top: 1px solid var(--border-light);
+          font-size: 14px;
+          color: var(--muted);
+        }
+        .link {
+          color: var(--green);
+          font-weight: 600;
+          text-decoration: none;
+        }
+        .link:hover { text-decoration: underline; }
 
       `}</style>
     </div>

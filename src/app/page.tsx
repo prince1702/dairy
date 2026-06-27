@@ -102,8 +102,8 @@ export default function Homepage() {
             </h1>
             <p className="hero-sub">Subscribe once. We deliver daily. You sleep peacefully — and wake up to fresh milk at your doorstep.</p>
             <div className="hero-actions">
-              <Link href={dashboardUrl} className="btn-primary">
-                Subscribe Now
+              <Link href={session ? dashboardUrl : "/register"} className="btn-primary">
+                {session ? "Go to Dashboard" : "Register Now"}
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </Link>
               <a href="#how" className="btn-ghost">How It Works</a>
@@ -476,6 +476,7 @@ export default function Homepage() {
             <div>
               <div className="footer-col-title">Portals</div>
               <ul className="footer-links">
+                <li><Link href="/register">New Customer Registration</Link></li>
                 <li><Link href="/login">Customer Login</Link></li>
                 <li><Link href="/login">Vendor Panel</Link></li>
                 <li><Link href="/login">Manager Panel</Link></li>

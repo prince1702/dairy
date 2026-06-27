@@ -253,11 +253,120 @@ export async function completeDelivery(
       return { totalCost, auditLog };
     });
 
-    revalidatePath("/delivery");
-    revalidatePath("/customer");
-    return { success: true, details: result };
+  revalidatePath("/delivery");
+  revalidatePath("/customer");
+  return { success: true, details: result };
   } catch (err: any) {
     console.error("completeDelivery error:", err);
     return { success: false, error: err.message };
   }
 }
+
+// 6. Public Customer Registration
+export async function registerCustomer(
+  name: string,
+  email: string,
+  phone: string,
+  address: string,
+  password: string
+) {
+  try {
+    const bcrypt = await import("bcryptjs");
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return { success: false, error: "An account with this email already exists." };
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          name,
+          email,
+          phone: phone || null,
+          address: address || null,
+          password: hashedPassword,
+          role: "CUSTOMER",
+          status: "ACTIVE",
+        },
+      });
+
+      await tx.wallet.create({
+        data: {
+          userId: user.id,
+          balance: 0.0,
+        },
+      });
+    });
+
+    return { success: true };
+  } catch (err: any) {
+    console.error("registerCustomer error:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+// 7. Admin creates a staff user (MANAGER, DELIVERY_PERSON, or SUB_ADMIN only)
+export async function createStaffUser(
+  name: string,
+  email: string,
+  password: string,
+  role: string,
+  phone: string
+) {
+  try {
+    const allowedRoles = ["MANAGER", "DELIVERY_PERSON", "SUB_ADMIN"];
+    if (!allowedRoles.includes(role)) {
+      return { success: false, error: "Invalid role. Only MANAGER, DELIVERY_PERSON, and SUB_ADMIN can be created from this panel." };
+    }
+
+    const bcrypt = await import("bcryptjs");
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return { success: false, error: "An account with this email already exists." };
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await prisma.user.create({
+      data: {
+        name,
+        email,
+        phone: phone || null,
+        password: hashedPassword,
+        role,
+        status: "ACTIVE",
+      },
+    });
+
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (err: any) {
+    console.error("createStaffUser error:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+// 8. Admin toggles user active/inactive status (soft disable — preserves referential integrity)
+export async function toggleUserStatus(userId: string) {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return { success: false, error: "User not found." };
+
+    const newStatus = user.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+    await prisma.user.update({
+      where: { id: userId },
+      data: { status: newStatus },
+    });
+
+    revalidatePath("/admin");
+    return { success: true, newStatus };
+  } catch (err: any) {
+    console.error("toggleUserStatus error:", err);
+    return { success: false, error: err.message };
+  }
+}
+
