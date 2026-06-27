@@ -1,0 +1,104 @@
+import React from "react";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { redirect } from "next/navigation";
+import { prisma } from "@/lib/db";
+import { DashboardHeader } from "@/components/DashboardHeader";
+import { AdminDashboardClient } from "@/components/AdminDashboardClient";
+
+export default async function AdminDashboardPage() {
+  const session = await getServerSession(authOptions);
+
+  if (!session || (session.user as any).role !== "ADMIN") {
+    redirect("/login?error=Unauthorized");
+  }
+
+  // 1. Fetch system-wide KPIs
+  const totalCustomers = await prisma.user.count({
+    where: { role: "CUSTOMER" },
+  });
+
+  const wallets = await prisma.wallet.findMany({
+    select: { balance: true },
+  });
+  const totalWalletBalance = wallets.reduce((sum, w) => sum + w.balance, 0);
+
+  const pendingRechargesCount = await prisma.paymentRequest.count({
+    where: { status: "PENDING" },
+  });
+
+  const activeSubscriptionsCount = await prisma.subscription.count({
+    where: { status: "ACTIVE" },
+  });
+
+  // 2. Calculate Daily Demand Forecast (Grouped sum of active subscription quantities)
+  const activeSubItems = await prisma.subscriptionItem.findMany({
+    where: {
+      subscription: { status: "ACTIVE" },
+    },
+    include: {
+      product: {
+        select: { name: true, emoji: true, size: true },
+      },
+    },
+  });
+
+  // Aggregate quantities by product name
+  const forecastMap: Record<string, { name: string; emoji: string; size: string; total: number }> = {};
+  activeSubItems.forEach((item) => {
+    const key = `${item.productId}`;
+    if (!forecastMap[key]) {
+      forecastMap[key] = {
+        name: item.product.name,
+        emoji: item.product.emoji,
+        size: item.product.size,
+        total: 0,
+      };
+    }
+    forecastMap[key].total += item.quantity;
+  });
+
+  const forecast = Object.values(forecastMap).map((f) => ({
+    productName: f.name,
+    emoji: f.emoji,
+    size: f.size,
+    totalQuantity: f.total,
+  }));
+
+  // 3. Fetch all products
+  const products = await prisma.product.findMany({
+    orderBy: { category: "asc" },
+  });
+
+  // 4. Fetch recent system-wide transactions
+  const recentTransactions = await prisma.walletTransaction.findMany({
+    include: {
+      wallet: {
+        include: {
+          user: { select: { name: true } },
+        },
+      },
+    },
+    orderBy: { timestamp: "desc" },
+    take: 30,
+  });
+
+  const stats = {
+    totalCustomers,
+    totalWalletBalance,
+    pendingRechargesCount,
+    activeSubscriptionsCount,
+  };
+
+  return (
+    <>
+      <DashboardHeader role="Admin" />
+      <AdminDashboardClient
+        stats={stats}
+        forecast={forecast}
+        products={products}
+        recentTransactions={recentTransactions as any}
+      />
+    </>
+  );
+}

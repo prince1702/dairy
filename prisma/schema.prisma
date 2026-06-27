@@ -1,0 +1,156 @@
+// This is your Prisma schema file
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id              String             @id @default(uuid())
+  email           String             @unique
+  password        String
+  name            String
+  phone           String?
+  address         String?
+  role            String             // "ADMIN", "SUB_ADMIN", "MANAGER", "DELIVERY_PERSON", "CUSTOMER"
+  status          String             @default("ACTIVE") // "ACTIVE", "INACTIVE"
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  wallet          Wallet?
+  subscriptions   Subscription[]
+  notifications   Notification[]
+  paymentRequests PaymentRequest[]   @relation("CustomerPayments")
+  reviewedRequests PaymentRequest[]  @relation("ManagerReviews")
+  
+  routeAssignments RouteAssignment[] @relation("CustomerRoute")
+  deliveredRoutes  RouteAssignment[] @relation("DeliveryPersonRoute")
+  managedRoutes    Route[]           @relation("ManagerRoute")
+}
+
+model Product {
+  id               String             @id @default(uuid())
+  name             String
+  emoji            String             @default("🥛")
+  category         String             @default("Milk")
+  price            Float
+  size             String             // "500ml", "1L", "250g", etc.
+  available        Boolean            @default(true)
+  description      String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  
+  subscriptionItems SubscriptionItem[]
+  forecasts        DailyDemandForecast[]
+}
+
+model Wallet {
+  id           String              @id @default(uuid())
+  balance      Float               @default(0.0)
+  userId       String              @unique
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions WalletTransaction[]
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+}
+
+model WalletTransaction {
+  id            String   @id @default(uuid())
+  walletId      String
+  wallet        Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  beforeBalance Float
+  afterBalance  Float
+  changeAmount  Float
+  source        String   // "RECHARGE", "DELIVERY_DEDUCTION", "ADMIN_ADJUSTMENT"
+  description   String?
+  timestamp     DateTime @default(now())
+}
+
+model Subscription {
+  id         String             @id @default(uuid())
+  customerId String
+  customer   User               @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  status     String             @default("ACTIVE") // "ACTIVE", "PAUSED", "CANCELLED"
+  startDate  DateTime           @default(now())
+  endDate    DateTime?
+  items      SubscriptionItem[]
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+}
+
+model SubscriptionItem {
+  id             String       @id @default(uuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  productId      String
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity       Int          @default(1)
+}
+
+model Route {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  managerId   String?
+  manager     User?    @relation("ManagerRoute", fields: [managerId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  assignments RouteAssignment[]
+}
+
+model RouteAssignment {
+  id               String @id @default(uuid())
+  routeId          String
+  route            Route  @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  
+  deliveryPersonId String
+  deliveryPerson   User   @relation("DeliveryPersonRoute", fields: [deliveryPersonId], references: [id], onDelete: Cascade)
+  
+  customerId       String
+  customer         User   @relation("CustomerRoute", fields: [customerId], references: [id], onDelete: Cascade)
+
+  sequence         Int    @default(0) // Order of delivery
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model DailyDemandForecast {
+  id                 String   @id @default(uuid())
+  date               DateTime
+  productId          String
+  product            Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantityForecasted Int
+  quantityActual     Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  title       String
+  message     String
+  type        String   // "DELIVERY", "WALLET", "PROMOTION", "SYSTEM"
+  recipientId String
+  recipient   User     @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  isRead      Boolean  @default(false)
+  timestamp   DateTime @default(now())
+}
+
+model PaymentRequest {
+  id            String   @id @default(uuid())
+  customerId    String
+  customer      User     @relation("CustomerPayments", fields: [customerId], references: [id], onDelete: Cascade)
+  amount        Float
+  screenshotUrl String
+  status        String   @default("PENDING") // "PENDING", "APPROVED", "REJECTED"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  reviewedById  String?
+  reviewedBy    User?    @relation("ManagerReviews", fields: [reviewedById], references: [id], onDelete: SetNull)
+}
