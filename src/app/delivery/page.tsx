@@ -76,6 +76,20 @@ export default async function DeliveryDashboardPage() {
     });
   }
 
+  // 3. Fetch today's already-completed deliveries for this delivery person
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const todayDeliveries = await prisma.delivery.findMany({
+    where: {
+      deliveryPersonId,
+      deliveredAt: { gte: today },
+    },
+    select: { customerId: true },
+  });
+
+  const completedCustomerIds = todayDeliveries.map((d) => d.customerId);
+
   return (
     <>
       <DashboardHeader role="Delivery" />
@@ -83,6 +97,7 @@ export default async function DeliveryDashboardPage() {
         deliveryPersonId={deliveryPersonId}
         route={route}
         customers={customers}
+        completedCustomerIds={completedCustomerIds}
       />
     </>
   );

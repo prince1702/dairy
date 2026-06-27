@@ -250,12 +250,31 @@ export async function completeDelivery(
         },
       });
 
+      // Create permanent Delivery record
+      const snapshotItems = subscription.items.map((item) => ({
+        name: item.product.name,
+        quantity: item.quantity,
+        size: item.product.size,
+        price: item.product.price,
+      }));
+
+      await tx.delivery.create({
+        data: {
+          customerId,
+          deliveryPersonId,
+          itemsSnapshot: JSON.stringify(snapshotItems),
+          totalCost,
+          walletTransactionId: auditLog.id,
+          status: "DELIVERED",
+        },
+      });
+
       return { totalCost, auditLog };
     });
 
-  revalidatePath("/delivery");
-  revalidatePath("/customer");
-  return { success: true, details: result };
+    revalidatePath("/delivery");
+    revalidatePath("/customer");
+    return { success: true, details: result };
   } catch (err: any) {
     console.error("completeDelivery error:", err);
     return { success: false, error: err.message };
@@ -369,4 +388,120 @@ export async function toggleUserStatus(userId: string) {
     return { success: false, error: err.message };
   }
 }
+
+// 9. Delivery person reports a delivery issue (does not deduct wallet balance)
+export async function reportDeliveryIssue(
+  deliveryPersonId: string,
+  customerId: string,
+  issueNote: string
+) {
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const deliveryRecord = await tx.delivery.create({
+        data: {
+          customerId,
+          deliveryPersonId,
+          itemsSnapshot: "[]",
+          totalCost: 0,
+          status: "ISSUE_REPORTED",
+          issueNote,
+        },
+      });
+
+      // Find customer's route manager to notify
+      const assignment = await tx.routeAssignment.findFirst({
+        where: { customerId },
+        include: { route: true },
+      });
+
+      const managerId = assignment?.route?.managerId;
+      if (managerId) {
+        const customerUser = await tx.user.findUnique({ where: { id: customerId } });
+        await tx.notification.create({
+          data: {
+            recipientId: managerId,
+            title: "Delivery Issue Reported",
+            message: `Issue reported for ${customerUser?.name || "customer"}: ${issueNote}`,
+            type: "SYSTEM",
+          },
+        });
+      }
+
+      return deliveryRecord;
+    });
+
+    revalidatePath("/delivery");
+    revalidatePath("/manager");
+    return { success: true, details: result };
+  } catch (err: any) {
+    console.error("reportDeliveryIssue error:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+// 10. Manager creates a new delivery route
+export async function createRoute(name: string, description?: string) {
+  try {
+    const existing = await prisma.route.findUnique({ where: { name } });
+    if (existing) return { success: false, error: "A route with this name already exists." };
+
+    const route = await prisma.route.create({
+      data: { name, description: description || null },
+    });
+
+    revalidatePath("/manager");
+    return { success: true, route };
+  } catch (err: any) {
+    console.error("createRoute error:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+// 11. Manager assigns customer and delivery person to a route
+export async function assignCustomerToRoute(
+  routeId: string,
+  customerId: string,
+  deliveryPersonId: string,
+  sequence: number
+) {
+  try {
+    // Check if customer already has a route assignment and remove it or update
+    await prisma.routeAssignment.deleteMany({
+      where: { customerId },
+    });
+
+    const assignment = await prisma.routeAssignment.create({
+      data: {
+        routeId,
+        customerId,
+        deliveryPersonId,
+        sequence: Number(sequence) || 0,
+      },
+    });
+
+    revalidatePath("/manager");
+    revalidatePath("/delivery");
+    return { success: true, assignment };
+  } catch (err: any) {
+    console.error("assignCustomerToRoute error:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+// 12. Manager removes a route assignment
+export async function removeRouteAssignment(assignmentId: string) {
+  try {
+    await prisma.routeAssignment.delete({
+      where: { id: assignmentId },
+    });
+
+    revalidatePath("/manager");
+    revalidatePath("/delivery");
+    return { success: true };
+  } catch (err: any) {
+    console.error("removeRouteAssignment error:", err);
+    return { success: false, error: err.message };
+  }
+}
+
 

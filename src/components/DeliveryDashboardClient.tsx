@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { completeDelivery } from "@/app/actions";
+import { completeDelivery, reportDeliveryIssue } from "@/app/actions";
 
 interface SubscriptionItem {
   product: {
@@ -29,17 +29,24 @@ interface DeliveryDashboardProps {
     description: string | null;
   } | null;
   customers: AssignedCustomer[];
+  completedCustomerIds?: string[];
 }
 
 export function DeliveryDashboardClient({
   deliveryPersonId,
   route,
   customers,
+  completedCustomerIds = [],
 }: DeliveryDashboardProps) {
-  const [completedIds, setCompletedIds] = useState<string[]>([]);
+  const [completedIds, setCompletedIds] = useState<string[]>(completedCustomerIds);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [successInfo, setSuccessInfo] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+
+  // Issue reporting state
+  const [reportingCustomerId, setReportingCustomerId] = useState<string | null>(null);
+  const [issueNote, setIssueNote] = useState("");
+  const [reportingSubmitting, setReportingSubmitting] = useState(false);
 
   const handleComplete = async (customerId: string, customerName: string) => {
     setSubmittingId(customerId);
@@ -58,6 +65,28 @@ export function DeliveryDashboardClient({
       );
     } else {
       setErrorMsg(res.error || "Failed to mark delivery complete.");
+    }
+  };
+
+  const handleReportSubmit = async (customerId: string, customerName: string) => {
+    if (!issueNote.trim()) {
+      setErrorMsg("Please enter an issue note.");
+      return;
+    }
+    setReportingSubmitting(true);
+    setErrorMsg("");
+    setSuccessInfo("");
+
+    const res = await reportDeliveryIssue(deliveryPersonId, customerId, issueNote);
+    setReportingSubmitting(false);
+
+    if (res.success) {
+      setCompletedIds((prev) => [...prev, customerId]);
+      setReportingCustomerId(null);
+      setIssueNote("");
+      setSuccessInfo(`Delivery issue logged for ${customerName} and notified to Manager.`);
+    } else {
+      setErrorMsg(res.error || "Failed to report issue.");
     }
   };
 
@@ -108,20 +137,60 @@ export function DeliveryDashboardClient({
                         <span className="seq-badge">#{c.sequence}</span>
                         <strong>{c.name}</strong>
                       </div>
-                      <div>
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                         {isCompleted ? (
-                          <span className="badge badge-success">Delivered ✓</span>
+                          <span className="badge badge-success">Done ✓</span>
                         ) : (
-                          <button
-                            onClick={() => handleComplete(c.id, c.name)}
-                            disabled={submittingId === c.id}
-                            className="btn btn-primary complete-btn"
-                          >
-                            {submittingId === c.id ? "Processing..." : "Mark Delivered"}
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleComplete(c.id, c.name)}
+                              disabled={submittingId === c.id || reportingSubmitting}
+                              className="btn btn-primary complete-btn"
+                            >
+                              {submittingId === c.id ? "Processing..." : "Mark Delivered"}
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (reportingCustomerId === c.id) {
+                                  setReportingCustomerId(null);
+                                } else {
+                                  setReportingCustomerId(c.id);
+                                  setIssueNote("");
+                                }
+                              }}
+                              className="btn btn-ghost"
+                              style={{ padding: "6px 12px", fontSize: "12px" }}
+                            >
+                              {reportingCustomerId === c.id ? "Cancel" : "Report Issue"}
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>
+
+                    {reportingCustomerId === c.id && !isCompleted && (
+                      <div className="issue-box mt-3" style={{ background: "var(--white)", padding: "12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
+                        <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--text)", display: "block", marginBottom: "4px" }}>
+                          Issue Note for Manager:
+                        </label>
+                        <textarea
+                          rows={2}
+                          className="form-input"
+                          style={{ width: "100%", fontSize: "13px", marginBottom: "8px" }}
+                          placeholder="e.g. Door locked, customer out of town, product damaged..."
+                          value={issueNote}
+                          onChange={(e) => setIssueNote(e.target.value)}
+                        />
+                        <button
+                          onClick={() => handleReportSubmit(c.id, c.name)}
+                          disabled={reportingSubmitting}
+                          className="btn btn-primary"
+                          style={{ padding: "6px 14px", fontSize: "12px" }}
+                        >
+                          {reportingSubmitting ? "Submitting..." : "Submit Issue Report"}
+                        </button>
+                      </div>
+                    )}
 
                     <div className="item-details mt-4">
                       <div className="detail-row">

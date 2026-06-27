@@ -31,6 +31,9 @@ model User {
   routeAssignments RouteAssignment[] @relation("CustomerRoute")
   deliveredRoutes  RouteAssignment[] @relation("DeliveryPersonRoute")
   managedRoutes    Route[]           @relation("ManagerRoute")
+
+  deliveriesAsCustomer       Delivery[] @relation("CustomerDeliveries")
+  deliveriesAsDeliveryPerson Delivery[] @relation("DeliveryPersonDeliveries")
 }
 
 model Product {
@@ -155,3 +158,18 @@ model PaymentRequest {
   reviewedById  String?
   reviewedBy    User?    @relation("ManagerReviews", fields: [reviewedById], references: [id], onDelete: SetNull)
 }
+
+model Delivery {
+  id                  String   @id @default(uuid())
+  customerId          String
+  customer            User     @relation("CustomerDeliveries", fields: [customerId], references: [id], onDelete: Cascade)
+  deliveryPersonId    String
+  deliveryPerson      User     @relation("DeliveryPersonDeliveries", fields: [deliveryPersonId], references: [id], onDelete: Cascade)
+  deliveredAt         DateTime @default(now())
+  itemsSnapshot       String   // JSON string of items delivered, e.g. [{"name":"...","quantity":2,"size":"500ml","price":30}]
+  totalCost           Float
+  walletTransactionId String?
+  status              String   @default("DELIVERED") // "DELIVERED", "ISSUE_REPORTED"
+  issueNote           String?
+}
+

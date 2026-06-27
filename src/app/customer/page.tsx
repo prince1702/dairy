@@ -68,6 +68,12 @@ export default async function CustomerDashboardPage() {
     orderBy: { timestamp: "desc" },
   });
 
+  // 7. Fetch delivery history
+  const deliveries = await prisma.delivery.findMany({
+    where: { customerId },
+    orderBy: { deliveredAt: "desc" },
+  });
+
   return (
     <>
       <DashboardHeader role="Customer" />
@@ -78,6 +84,7 @@ export default async function CustomerDashboardPage() {
         products={products}
         paymentRequests={paymentRequests}
         notifications={notifications}
+        deliveries={deliveries}
       />
     </>
   );

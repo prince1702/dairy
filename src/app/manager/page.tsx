@@ -53,6 +53,38 @@ export default async function ManagerDashboardPage() {
     orderBy: { name: "asc" },
   });
 
+  // 4. Fetch routes with assignments
+  const routes = await prisma.route.findMany({
+    include: {
+      assignments: {
+        include: {
+          customer: { select: { id: true, name: true, email: true } },
+          deliveryPerson: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { sequence: "asc" },
+      },
+    },
+    orderBy: { name: "asc" },
+  });
+
+  // 5. Fetch all delivery persons
+  const deliveryPersons = await prisma.user.findMany({
+    where: { role: "DELIVERY_PERSON", status: "ACTIVE" },
+    select: { id: true, name: true, email: true },
+    orderBy: { name: "asc" },
+  });
+
+  // 6. Fetch customers who don't yet have a route assignment
+  const unassignedCustomers = await prisma.user.findMany({
+    where: {
+      role: "CUSTOMER",
+      status: "ACTIVE",
+      routeAssignments: { none: {} },
+    },
+    select: { id: true, name: true, email: true },
+    orderBy: { name: "asc" },
+  });
+
   return (
     <>
       <DashboardHeader role="Manager" />
@@ -61,6 +93,9 @@ export default async function ManagerDashboardPage() {
         pendingRequests={pendingRequests}
         processedRequests={processedRequests}
         customers={customers}
+        routes={routes}
+        deliveryPersons={deliveryPersons}
+        unassignedCustomers={unassignedCustomers}
       />
     </>
   );

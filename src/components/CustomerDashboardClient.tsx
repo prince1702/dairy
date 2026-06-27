@@ -13,6 +13,15 @@ interface Product {
   size: string;
 }
 
+interface DeliveryRecord {
+  id: string;
+  deliveredAt: Date;
+  itemsSnapshot: string;
+  totalCost: number;
+  status: string;
+  issueNote: string | null;
+}
+
 interface CustomerDashboardProps {
   customer: {
     id: string;
@@ -53,6 +62,7 @@ interface CustomerDashboardProps {
     isRead: boolean;
     timestamp: Date;
   }[];
+  deliveries?: DeliveryRecord[];
 }
 
 export function CustomerDashboardClient({
@@ -62,6 +72,7 @@ export function CustomerDashboardClient({
   products,
   paymentRequests,
   notifications,
+  deliveries = [],
 }: CustomerDashboardProps) {
   // Subscription state
   const [subQuantities, setSubQuantities] = useState<Record<string, number>>(() => {
@@ -346,6 +357,46 @@ export function CustomerDashboardClient({
                     </div>
                   </div>
                 ))
+              )}
+            </div>
+          </div>
+
+          {/* Delivery History */}
+          <div className="card delivery-history-card mt-4">
+            <h3>Delivery History</h3>
+            <div className="transactions-list mt-4">
+              {deliveries.length === 0 ? (
+                <p className="text-muted text-center py-4">No delivery history records yet.</p>
+              ) : (
+                deliveries.map((del) => {
+                  let items: any[] = [];
+                  try { items = JSON.parse(del.itemsSnapshot); } catch {}
+                  return (
+                    <div key={del.id} className="tx-item flex-between">
+                      <div className="tx-info">
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <strong>{new Date(del.deliveredAt).toLocaleDateString()}</strong>
+                          <span className={`badge badge-${del.status === "DELIVERED" ? "success" : "danger"}`}>
+                            {del.status === "DELIVERED" ? "Delivered ✓" : "Issue Reported"}
+                          </span>
+                        </div>
+                        {del.issueNote && (
+                          <div className="text-muted" style={{ fontSize: "12px", marginTop: "2px", color: "#b91c1c" }}>
+                            Note: {del.issueNote}
+                          </div>
+                        )}
+                        <div className="tx-time text-muted" style={{ marginTop: "4px" }}>
+                          {items.length > 0
+                            ? items.map((i: any) => `${i.quantity}x ${i.name} (${i.size})`).join(", ")
+                            : "No items listed"}
+                        </div>
+                      </div>
+                      <div className="tx-amount negative" style={{ textAlign: "right" }}>
+                        -₹{del.totalCost.toFixed(2)}
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
