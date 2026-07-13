@@ -12,7 +12,6 @@ function RegisterForm() {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -27,10 +26,6 @@ function RegisterForm() {
     }
     if (password.length < 8) {
       setErrorMsg("Password must be at least 8 characters.");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setErrorMsg("Passwords do not match.");
       return;
     }
 
@@ -73,7 +68,6 @@ function RegisterForm() {
                 id="name"
                 type="text"
                 className="form-input"
-                placeholder="e.g. Ramesh Patel"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
@@ -85,7 +79,6 @@ function RegisterForm() {
                 id="email"
                 type="email"
                 className="form-input"
-                placeholder="e.g. ramesh@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -100,7 +93,6 @@ function RegisterForm() {
                 id="phone"
                 type="tel"
                 className="form-input"
-                placeholder="+91 98765 43210"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
               />
@@ -118,31 +110,17 @@ function RegisterForm() {
             </div>
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label" htmlFor="password">Password</label>
-              <input
-                id="password"
-                type="password"
-                className="form-input"
-                placeholder="Min 8 characters"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="confirmPassword">Confirm Password</label>
-              <input
-                id="confirmPassword"
-                type="password"
-                className="form-input"
-                placeholder="Re-enter your password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-              />
-            </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="password">Password</label>
+            <input
+              id="password"
+              type="password"
+              className="form-input"
+              placeholder="Min 8 characters"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
           </div>
 
           <button
