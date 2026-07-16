@@ -1,5 +1,5 @@
 // Utility helper to handle payment screenshot uploads
-// Supports Cloudinary or falls back to local server upload via /api/upload
+// Supports Cloudinary or falls back to base64 data URL encoding
 
 export async function uploadScreenshot(file: File): Promise<string> {
   const cloudinaryUrl = process.env.CLOUDINARY_URL || "";
@@ -23,24 +23,23 @@ export async function uploadScreenshot(file: File): Promise<string> {
       const data = await response.json();
       return data.secure_url;
     } catch (err) {
-      console.error("Cloudinary upload error, falling back to local upload:", err);
+      console.error("Cloudinary upload error, falling back to base64:", err);
     }
   }
 
-  // Fallback: Upload to local server via /api/upload
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const response = await fetch("/api/upload", {
-    method: "POST",
-    body: formData,
+  // Fallback: Convert the file to a base64 data URL
+  // This gets stored directly in the database TEXT column
+  // and renders natively in <img> tags without any external service
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+      } else {
+        reject(new Error("Failed to read file"));
+      }
+    };
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsDataURL(file);
   });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || "File upload failed");
-  }
-
-  const data = await response.json();
-  return data.url;
 }
