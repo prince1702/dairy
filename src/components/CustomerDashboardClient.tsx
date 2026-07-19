@@ -141,6 +141,19 @@ export function CustomerDashboardClient({
     return now.getTime() > cutoff.getTime();
   };
 
+  const isTomorrowOnVacation = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    return vacations.some((v) => {
+      const start = new Date(v.startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(v.endDate);
+      end.setHours(0, 0, 0, 0);
+      return tomorrow >= start && tomorrow <= end;
+    });
+  };
+
   const handleQtyChange = (productId: string, val: number) => {
     setSubQuantities((prev) => ({
       ...prev,
@@ -419,6 +432,72 @@ export function CustomerDashboardClient({
 
         {/* RIGHT COLUMN: SUBSCRIPTIONS, OVERRIDES & VACATIONS */}
         <div className="grid-column">
+          {/* Active Daily Item List Card */}
+          <div className="card active-daily-items-card" style={{ borderLeft: "5px solid var(--green)" }}>
+            <h3>My Active Daily Items</h3>
+            <p className="text-muted mb-4">Quick summary of what you have subscribed to and what is coming tomorrow.</p>
+
+            <div className="delivery-summary-split">
+              {/* Regular Daily Baseline */}
+              <div className="baseline-list-box" style={{ background: "var(--cream)", padding: "16px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-light)" }}>
+                <h4 style={{ color: "var(--green-dark)", borderBottom: "2px solid var(--green-light)", paddingBottom: "8px", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
+                  📋 Regular Daily Baseline
+                </h4>
+                {products.filter(p => subQuantities[p.id] > 0).length === 0 ? (
+                  <p className="text-muted" style={{ fontSize: "13px" }}>No items in your regular daily list. Use the "Modify Recurring Delivery Schedule" form below to subscribe to products.</p>
+                ) : (
+                  <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {products.filter(p => subQuantities[p.id] > 0).map(p => (
+                      <li key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "14px" }}>
+                        <span>{p.emoji} {p.name} <span className="text-muted" style={{ fontSize: "12px" }}>({p.size})</span></span>
+                        <strong style={{ background: "var(--green-light)", color: "var(--green)", padding: "2px 8px", borderRadius: "12px", fontSize: "12px" }}>
+                          {subQuantities[p.id]} Qty
+                        </strong>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* Tomorrow's Active Delivery */}
+              <div className="tomorrow-list-box" style={{ background: "var(--cream)", padding: "16px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-light)" }}>
+                <h4 style={{ color: "var(--amber)", borderBottom: "2px solid var(--amber-light)", paddingBottom: "8px", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
+                  🚚 Tomorrow's Delivery
+                </h4>
+                {tomorrowPause ? (
+                  <div className="text-center py-2" style={{ color: "var(--error)", fontSize: "13px" }}>
+                    <strong>⏸️ Paused</strong>
+                    <p className="text-muted" style={{ fontSize: "11px", marginTop: "2px" }}>Tomorrow's delivery is paused by you.</p>
+                  </div>
+                ) : isTomorrowOnVacation() ? (
+                  <div className="text-center py-2" style={{ color: "var(--green)", fontSize: "13px" }}>
+                    <strong>✈️ Vacation Mode Active</strong>
+                    <p className="text-muted" style={{ fontSize: "11px", marginTop: "2px" }}>Pause scheduled via vacation planner.</p>
+                  </div>
+                ) : products.filter(p => overrideQuantities[p.id] > 0).length === 0 ? (
+                  <p className="text-muted" style={{ fontSize: "13px" }}>No items scheduled for tomorrow.</p>
+                ) : (
+                  <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {products.filter(p => overrideQuantities[p.id] > 0).map(p => {
+                      const isOverridden = overrideQuantities[p.id] !== (subscriptionItems.find(item => item.productId === p.id)?.quantity || 0);
+                      return (
+                        <li key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "14px" }}>
+                          <span>
+                            {p.emoji} {p.name} <span className="text-muted" style={{ fontSize: "12px" }}>({p.size})</span>
+                            {isOverridden && <span style={{ color: "var(--amber)", marginLeft: "4px", fontSize: "10px" }} title="Overridden for tomorrow">*</span>}
+                          </span>
+                          <strong style={{ background: "var(--amber-light)", color: "var(--amber)", padding: "2px 8px", borderRadius: "12px", fontSize: "12px" }}>
+                            {overrideQuantities[p.id]} Qty
+                          </strong>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Tomorrow's Order Override Card */}
           <div className="card tomorrow-delivery-card" style={{ borderLeft: "5px solid var(--amber)" }}>
             <div className="flex-between">
@@ -788,6 +867,19 @@ export function CustomerDashboardClient({
           display: flex;
           flex-direction: column;
           gap: 24px;
+        }
+        .delivery-summary-split {
+          display: flex;
+          gap: 16px;
+        }
+        .baseline-list-box, .tomorrow-list-box {
+          flex: 1;
+          min-width: 200px;
+        }
+        @media (max-width: 600px) {
+          .delivery-summary-split {
+            flex-direction: column;
+          }
         }
         .w-full {
           width: 100%;
