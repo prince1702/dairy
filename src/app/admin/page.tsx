@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { getResolvedOrderForDate } from "@/lib/overrideHelper";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { AdminDashboardClient } from "@/components/AdminDashboardClient";
 
@@ -31,32 +32,32 @@ export default async function AdminDashboardPage() {
     where: { status: "ACTIVE" },
   });
 
-  // 2. Calculate Daily Demand Forecast (Grouped sum of active subscription quantities)
-  const activeSubItems = await prisma.subscriptionItem.findMany({
-    where: {
-      subscription: { status: "ACTIVE" },
-    },
-    include: {
-      product: {
-        select: { name: true, emoji: true, size: true },
-      },
-    },
+  // 2. Calculate Daily Demand Forecast (Grouped sum of tomorrow's resolved quantities)
+  const activeCustomers = await prisma.user.findMany({
+    where: { role: "CUSTOMER", status: "ACTIVE" },
+    select: { id: true },
   });
 
-  // Aggregate quantities by product name
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+
   const forecastMap: Record<string, { name: string; emoji: string; size: string; total: number }> = {};
-  activeSubItems.forEach((item) => {
-    const key = `${item.productId}`;
-    if (!forecastMap[key]) {
-      forecastMap[key] = {
-        name: item.product.name,
-        emoji: item.product.emoji,
-        size: item.product.size,
-        total: 0,
-      };
+  for (const customer of activeCustomers) {
+    const resolvedItems = await getResolvedOrderForDate(customer.id, tomorrow);
+    for (const item of resolvedItems) {
+      const key = item.productId;
+      if (!forecastMap[key]) {
+        forecastMap[key] = {
+          name: item.name,
+          emoji: item.emoji,
+          size: item.size,
+          total: 0,
+        };
+      }
+      forecastMap[key].total += item.quantity;
     }
-    forecastMap[key].total += item.quantity;
-  });
+  }
 
   const forecast = Object.values(forecastMap).map((f) => ({
     productName: f.name,

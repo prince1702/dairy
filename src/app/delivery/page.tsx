@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { getResolvedOrderForDate } from "@/lib/overrideHelper";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { DeliveryDashboardClient } from "@/components/DeliveryDashboardClient";
 
@@ -38,42 +39,36 @@ export default async function DeliveryDashboardPage() {
             id: true,
             name: true,
             address: true,
-            subscriptions: {
-              where: { status: "ACTIVE" },
-              include: {
-                items: {
-                  include: { product: true },
-                },
-              },
-            },
           },
         },
       },
       orderBy: { sequence: "asc" },
     });
 
-    customers = assignments.map((a) => {
-      const activeSub = a.customer.subscriptions[0];
-      const subscriptionItems = activeSub
-        ? activeSub.items.map((item) => ({
-            product: {
-              name: item.product.name,
-              emoji: item.product.emoji,
-              size: item.product.size,
-              price: item.product.price,
-            },
-            quantity: item.quantity,
-          }))
-        : [];
+    const today = new Date();
 
-      return {
-        id: a.customer.id,
-        name: a.customer.name,
-        address: a.customer.address,
-        sequence: a.sequence,
-        subscriptionItems,
-      };
-    });
+    customers = await Promise.all(
+      assignments.map(async (a) => {
+        const resolvedItems = await getResolvedOrderForDate(a.customer.id, today);
+        const subscriptionItems = resolvedItems.map((item) => ({
+          product: {
+            name: item.name,
+            emoji: item.emoji,
+            size: item.size,
+            price: item.price,
+          },
+          quantity: item.quantity,
+        }));
+
+        return {
+          id: a.customer.id,
+          name: a.customer.name,
+          address: a.customer.address,
+          sequence: a.sequence,
+          subscriptionItems,
+        };
+      })
+    );
   }
 
   // 3. Fetch today's already-completed deliveries for this delivery person

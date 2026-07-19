@@ -74,6 +74,29 @@ export default async function CustomerDashboardPage() {
     orderBy: { deliveredAt: "desc" },
   });
 
+  // 8. Fetch tomorrow's Daily Modifications (overrides, pause state, vacations)
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+
+  const overrides = await prisma.orderOverride.findMany({
+    where: { customerId, targetDate: tomorrow },
+  });
+
+  const tomorrowOverrides = overrides.map(o => ({
+    productId: o.productId,
+    quantity: o.quantity,
+  }));
+
+  const tomorrowPause = await prisma.dailyPause.findUnique({
+    where: { customerId_pauseDate: { customerId, pauseDate: tomorrow } },
+  });
+
+  const vacations = await prisma.vacation.findMany({
+    where: { customerId },
+    orderBy: { startDate: "asc" },
+  });
+
   return (
     <>
       <DashboardHeader role="Customer" />
@@ -85,6 +108,13 @@ export default async function CustomerDashboardPage() {
         paymentRequests={paymentRequests}
         notifications={notifications}
         deliveries={deliveries}
+        tomorrowOverrides={tomorrowOverrides}
+        isTomorrowPaused={!!tomorrowPause}
+        vacations={vacations.map(v => ({
+          id: v.id,
+          startDate: v.startDate.toISOString(),
+          endDate: v.endDate.toISOString(),
+        }))}
       />
     </>
   );

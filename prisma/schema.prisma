@@ -35,6 +35,10 @@ model User {
 
   deliveriesAsCustomer       Delivery[] @relation("CustomerDeliveries")
   deliveriesAsDeliveryPerson Delivery[] @relation("DeliveryPersonDeliveries")
+  orderOverrides             OrderOverride[]
+  vacations                  Vacation[]
+  dailyPauses                DailyPause[]
+  subscriptionAuditLogs      SubscriptionAuditLog[]
 }
 
 model Product {
@@ -50,7 +54,8 @@ model Product {
   updatedAt        DateTime           @updatedAt
   
   subscriptionItems SubscriptionItem[]
-  forecasts        DailyDemandForecast[]
+  forecasts         DailyDemandForecast[]
+  orderOverrides    OrderOverride[]
 }
 
 model Wallet {
@@ -175,4 +180,48 @@ model Delivery {
   status              String   @default("DELIVERED") // "DELIVERED", "ISSUE_REPORTED"
   issueNote           String?
 }
+
+model OrderOverride {
+  id           String   @id @default(uuid())
+  customerId   String
+  customer     User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity     Int      // Overridden quantity (0 to remove, >0 to increase/decrease/add)
+  targetDate   DateTime // Date for which this override is active (e.g., tomorrow)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([customerId, productId, targetDate])
+}
+
+model Vacation {
+  id         String    @id @default(uuid())
+  customerId String
+  customer   User      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  startDate  DateTime
+  endDate    DateTime
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model DailyPause {
+  id         String   @id @default(uuid())
+  customerId String
+  customer   User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  pauseDate  DateTime // The specific date paused
+  createdAt  DateTime @default(now())
+
+  @@unique([customerId, pauseDate])
+}
+
+model SubscriptionAuditLog {
+  id         String   @id @default(uuid())
+  customerId String
+  customer   User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  actionType String   // "PAUSE", "VACATION_START", "VACATION_END", "OVERRIDE_QTY", "RESUME"
+  details    String   // JSON string of changes
+  timestamp  DateTime @default(now())
+}
+
 
