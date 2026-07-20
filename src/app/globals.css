@@ -245,3 +245,115 @@ nav.custom-nav {
 .mb-4 { margin-bottom: 16px; }
 .flex-between { display: flex; justify-content: space-between; align-items: center; }
 .grid-cols-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+
+/* ========================================================
+   MOBILE PHONE OPTIMIZATIONS (Screen width <= 768px)
+   ======================================================== */
+@media (max-width: 768px) {
+  /* Layout & Container spacing */
+  .container {
+    padding: 0 12px !important;
+  }
+  .card {
+    padding: 16px !important;
+    border-radius: var(--radius-sm) !important;
+  }
+  
+  /* Stacking columns */
+  .dashboard-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+  .grid-column {
+    gap: 16px !important;
+  }
+  .grid-cols-3 {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+  
+  /* Flexbox responsiveness wrapper */
+  .flex-between {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  /* Form & Interactive elements sizes */
+  .btn {
+    padding: 10px 16px !important;
+    font-size: 13px !important;
+    min-height: 44px; /* Touch target standard */
+  }
+  .w-full-mobile {
+    width: 100% !important;
+  }
+  .form-input {
+    padding: 10px 14px !important;
+    font-size: 14px !important;
+    min-height: 44px;
+  }
+  
+  /* Typography scales */
+  .welcome-banner h1 {
+    font-size: 20px !important;
+  }
+  h2 {
+    font-size: 18px !important;
+  }
+  h3 {
+    font-size: 16px !important;
+  }
+  p {
+    font-size: 13px !important;
+  }
+
+  /* Scrollable Responsive Tables */
+  .requests-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    margin-top: 12px;
+  }
+  
+  .dashboard-table {
+    min-width: 600px !important; /* Prevents columns from compressing */
+    width: 100%;
+  }
+  
+  .dashboard-table th, .dashboard-table td {
+    padding: 10px 12px !important;
+    font-size: 12px !important;
+  }
+
+  /* Modal responsiveness */
+  .modal-overlay {
+    padding: 10px !important;
+  }
+  .modal-card, .modal-content {
+    padding: 16px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: var(--radius-sm) !important;
+  }
+  
+  /* Custom responsive tweaks for forms in dashboard cards */
+  .sub-product-row {
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+  .quantity-selector {
+    gap: 8px !important;
+    padding: 2px !important;
+  }
+  .qty-btn {
+    width: 26px !important;
+    height: 26px !important;
+    font-size: 14px !important;
+  }
+}
+

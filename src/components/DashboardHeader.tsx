@@ -86,6 +86,29 @@ export function DashboardHeader({ role }: DashboardHeaderProps) {
           font-size: 12px;
           border-radius: 6px;
         }
+
+        @media (max-width: 600px) {
+          .dashboard-header {
+            flex-direction: column;
+            gap: 12px;
+            padding: 12px 16px;
+            align-items: center;
+          }
+          .header-brand {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
+          .header-user {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid var(--border-light);
+            padding-top: 10px;
+          }
+        }
       `}</style>
     </header>
   );
