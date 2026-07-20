@@ -203,7 +203,7 @@ export default async function AdminDashboardPage() {
     select: {
       id: true,
       name: true,
-      routeAssignments: {
+      deliveredRoutes: {
         select: {
           route: { select: { name: true } },
           customer: { select: { id: true } },
@@ -214,8 +214,8 @@ export default async function AdminDashboardPage() {
 
   const deliveryBoyPerformance = await Promise.all(
     dbPersons.map(async (dp) => {
-      const assignedCount = dp.routeAssignments.length;
-      const assignedCustIds = dp.routeAssignments.map((ra) => ra.customer.id);
+      const assignedCount = dp.deliveredRoutes.length;
+      const assignedCustIds = dp.deliveredRoutes.map((ra) => ra.customer.id);
       const completedCount = await prisma.delivery.count({
         where: {
           deliveryPersonId: dp.id,
@@ -233,7 +233,7 @@ export default async function AdminDashboardPage() {
 
       const pendingCount = Math.max(0, assignedCount - completedCount - issueCount);
       const completionPct = assignedCount > 0 ? Math.round((completedCount / assignedCount) * 100) : 0;
-      const assignedRouteName = dp.routeAssignments[0]?.route?.name || "No Route Assigned";
+      const assignedRouteName = dp.deliveredRoutes[0]?.route?.name || "No Route Assigned";
 
       return {
         name: dp.name,
