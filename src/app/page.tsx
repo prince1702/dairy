@@ -38,7 +38,7 @@ export default function Homepage() {
             <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
               <path d="M11 2C11 2 5 7 5 12.5C5 15.538 7.686 18 11 18C14.314 18 17 15.538 17 12.5C17 7 11 2 11 2Z" fill="white" opacity="0.9"/>
               <circle cx="11" cy="12.5" r="2.5" fill="#1A6B3C"/>
-              <path d="M8 8C8 8 6 10 6 12" stroke="white" stroke-width="1.2" stroke-linecap="round" opacity="0.5"/>
+              <path d="M8 8C8 8 6 10 6 12" stroke="white" strokeWidth="1.2" strokeLinecap="round" opacity="0.5"/>
             </svg>
           </div>
           <div>
@@ -104,7 +104,7 @@ export default function Homepage() {
             <div className="hero-actions">
               <Link href={session ? dashboardUrl : "/register"} className="btn-primary">
                 {session ? "Go to Dashboard" : "Register Now"}
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </Link>
               <a href="#how" className="btn-ghost">How It Works</a>
             </div>
