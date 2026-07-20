@@ -99,9 +99,6 @@ export function CustomerDashboardClient({
   const [subSubmitting, setSubSubmitting] = useState(false);
   const [subSuccess, setSubSuccess] = useState(false);
 
-  // Tab navigation state
-  const [activeTab, setActiveTab] = useState<"deliveries" | "wallet" | "history">("deliveries");
-
   // Tomorrow's Override State
   const [tomorrowPause, setTomorrowPause] = useState(isTomorrowPaused);
   const [overrideQuantities, setOverrideQuantities] = useState<Record<string, number>>(() => {
@@ -347,506 +344,6 @@ export function CustomerDashboardClient({
     }
   };
 
-  const renderDeliveriesTab = () => (
-    <div className="dashboard-grid">
-      {/* LEFT COLUMN: ACTIVE SUMMARY & TOMORROW'S OVERRIDE */}
-      <div className="grid-column">
-        {/* Active Daily Item List Card */}
-        <div className="card active-daily-items-card" style={{ borderLeft: "5px solid var(--green)" }}>
-          <h3>My Active Daily Items</h3>
-          <p className="text-muted mb-4">Quick summary of what you have subscribed to and what is coming tomorrow.</p>
-
-          <div className="delivery-summary-split">
-            {/* Regular Daily Baseline */}
-            <div className="baseline-list-box" style={{ background: "var(--cream)", padding: "16px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-light)" }}>
-              <h4 style={{ color: "var(--green-dark)", borderBottom: "2px solid var(--green-light)", paddingBottom: "8px", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
-                📋 Regular Daily Baseline
-              </h4>
-              {products.filter(p => subQuantities[p.id] > 0).length === 0 ? (
-                <p className="text-muted" style={{ fontSize: "13px" }}>No items in your regular daily list. Use the schedule form to subscribe.</p>
-              ) : (
-                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "8px" }}>
-                  {products.filter(p => subQuantities[p.id] > 0).map(p => (
-                    <li key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "14px" }}>
-                      <span>{p.emoji} {p.name} <span className="text-muted" style={{ fontSize: "12px" }}>({p.size})</span></span>
-                      <strong style={{ background: "var(--green-light)", color: "var(--green)", padding: "2px 8px", borderRadius: "12px", fontSize: "12px" }}>
-                        {subQuantities[p.id]} Qty
-                      </strong>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            {/* Tomorrow's Active Delivery */}
-            <div className="tomorrow-list-box" style={{ background: "var(--cream)", padding: "16px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-light)" }}>
-              <h4 style={{ color: "var(--amber)", borderBottom: "2px solid var(--amber-light)", paddingBottom: "8px", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
-                🚚 Tomorrow's Delivery
-              </h4>
-              {tomorrowPause ? (
-                <div className="text-center py-2" style={{ color: "var(--error)", fontSize: "13px" }}>
-                  <strong>⏸️ Paused</strong>
-                  <p className="text-muted" style={{ fontSize: "11px", marginTop: "2px" }}>Tomorrow's delivery is paused by you.</p>
-                </div>
-              ) : isTomorrowOnVacation() ? (
-                <div className="text-center py-2" style={{ color: "var(--green)", fontSize: "13px" }}>
-                  <strong>✈️ Vacation Mode Active</strong>
-                  <p className="text-muted" style={{ fontSize: "11px", marginTop: "2px" }}>Pause scheduled via vacation planner.</p>
-                </div>
-              ) : products.filter(p => overrideQuantities[p.id] > 0).length === 0 ? (
-                <p className="text-muted" style={{ fontSize: "13px" }}>No items scheduled for tomorrow.</p>
-              ) : (
-                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "8px" }}>
-                  {products.filter(p => overrideQuantities[p.id] > 0).map(p => {
-                    const isOverridden = overrideQuantities[p.id] !== (subscriptionItems.find(item => item.productId === p.id)?.quantity || 0);
-                    return (
-                      <li key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "14px" }}>
-                        <span>
-                          {p.emoji} {p.name} <span className="text-muted" style={{ fontSize: "12px" }}>({p.size})</span>
-                          {isOverridden && <span style={{ color: "var(--amber)", marginLeft: "4px", fontSize: "10px" }} title="Overridden for tomorrow">*</span>}
-                        </span>
-                        <strong style={{ background: "var(--amber-light)", color: "var(--amber)", padding: "2px 8px", borderRadius: "12px", fontSize: "12px" }}>
-                          {overrideQuantities[p.id]} Qty
-                        </strong>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Tomorrow's Order Override Card */}
-        <div className="card tomorrow-delivery-card" style={{ borderLeft: "5px solid var(--amber)" }}>
-          <div className="flex-between">
-            <h3>Tomorrow's Delivery Override</h3>
-            <span className={`badge ${isCutoffPassed() ? "badge-danger" : "badge-success"}`}>
-              {isCutoffPassed() ? "🔒 Locked (After 10 PM)" : "🔓 Open for edits"}
-            </span>
-          </div>
-          <p className="text-muted mb-4">Modify tomorrow's quantities only. Does not overwrite your recurring schedule.</p>
-
-          {overrideError && <div className="badge badge-danger mb-4 block-alert">{overrideError}</div>}
-          {overrideSuccess && <div className="badge badge-success mb-4 block-alert">Tomorrow's order settings saved!</div>}
-
-          {/* Pause Toggle */}
-          <div className="pause-toggle-row flex-between mb-4 p-3" style={{ background: "var(--cream)", borderRadius: "var(--radius-sm)", border: "1px dashed var(--border)" }}>
-            <div>
-              <strong>Pause Tomorrow's Delivery</strong>
-              <div className="text-muted" style={{ fontSize: "11px" }}>Skip delivery for tomorrow without charging your wallet</div>
-            </div>
-            <button
-              type="button"
-              onClick={handlePauseToggle}
-              disabled={pauseSubmitting || isCutoffPassed()}
-              className={`btn ${tomorrowPause ? "btn-secondary" : "btn-ghost"}`}
-              style={{ padding: "6px 14px", fontSize: "12px" }}
-            >
-              {pauseSubmitting ? "Updating..." : tomorrowPause ? "⏸️ Paused (Resume)" : "▶️ Active (Pause)"}
-            </button>
-          </div>
-
-          {!tomorrowPause && (
-            <form onSubmit={handleOverrideSubmit}>
-              <div className="products-list">
-                {products.map((p) => {
-                  const recurring = subscriptionItems.find((item) => item.productId === p.id);
-                  const recurringQty = recurring ? recurring.quantity : 0;
-                  const hasOverride = overrideQuantities[p.id] !== recurringQty;
-
-                  return (
-                    <div key={p.id} className="sub-product-row flex-between">
-                      <div className="product-info">
-                        <span className="emoji">{p.emoji}</span>
-                        <div>
-                          <strong>{p.name}</strong>
-                          <div className="size text-muted">
-                            {p.size} • ₹{p.price.toFixed(2)}
-                            {hasOverride && (
-                              <span className="badge badge-warning" style={{ marginLeft: "8px", fontSize: "9px", padding: "2px 6px" }}>
-                                Modified for Tomorrow
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="quantity-selector">
-                        <button
-                          type="button"
-                          className="qty-btn"
-                          onClick={() => handleOverrideQtyChange(p.id, overrideQuantities[p.id] - 1)}
-                          disabled={overrideSubmitting || isCutoffPassed()}
-                        >
-                          -
-                        </button>
-                        <span className="qty-val">{overrideQuantities[p.id]}</span>
-                        <button
-                          type="button"
-                          className="qty-btn"
-                          onClick={() => handleOverrideQtyChange(p.id, overrideQuantities[p.id] + 1)}
-                          disabled={overrideSubmitting || isCutoffPassed()}
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <button
-                type="submit"
-                className="btn btn-primary w-full mt-4"
-                disabled={overrideSubmitting || isCutoffPassed()}
-              >
-                {overrideSubmitting ? "Saving Tomorrow's Override..." : "Save Tomorrow's Delivery Only"}
-              </button>
-            </form>
-          )}
-
-          {tomorrowPause && (
-            <div className="text-center py-6 text-muted" style={{ background: "var(--cream)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-light)" }}>
-              🚫 Tomorrow's delivery is paused. Reactivate by clicking "Resume" above.
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* RIGHT COLUMN: RECURRING SCHEDULE & VACATION PLANNER */}
-      <div className="grid-column">
-        {/* Subscription Manager */}
-        <div className="card subscription-card">
-          <h3>Modify Recurring Delivery Schedule</h3>
-          <p className="text-muted mb-4">Set the baseline quantity of each dairy item you want delivered daily.</p>
-          {subSuccess && <div className="badge badge-success mb-4 block-alert">Subscription schedule updated successfully!</div>}
-
-          <form onSubmit={handleSubSubmit}>
-            <div className="products-list">
-              {products.map((p) => (
-                <div key={p.id} className="sub-product-row flex-between">
-                  <div className="product-info">
-                    <span className="emoji">{p.emoji}</span>
-                    <div>
-                      <strong>{p.name}</strong>
-                      <div className="size text-muted">{p.size} • ₹{p.price.toFixed(2)}</div>
-                    </div>
-                  </div>
-                  <div className="quantity-selector">
-                    <button
-                      type="button"
-                      className="qty-btn"
-                      onClick={() => handleQtyChange(p.id, subQuantities[p.id] - 1)}
-                      disabled={subSubmitting}
-                    >
-                      -
-                    </button>
-                    <span className="qty-val">{subQuantities[p.id]}</span>
-                    <button
-                      type="button"
-                      className="qty-btn"
-                      onClick={() => handleQtyChange(p.id, subQuantities[p.id] + 1)}
-                      disabled={subSubmitting}
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <button type="submit" className="btn btn-primary w-full mt-4" disabled={subSubmitting}>
-              {subSubmitting ? "Saving Baseline..." : "Save Baseline Schedule"}
-            </button>
-          </form>
-        </div>
-
-        {/* Vacation Mode Planner */}
-        <div className="card vacation-card" style={{ borderLeft: "5px solid var(--green)" }}>
-          <h3>Vacation Mode Scheduler</h3>
-          <p className="text-muted mb-4">Pause all deliveries for multiple days. Wallet will not be charged.</p>
-
-          {vacationError && <div className="badge badge-danger mb-4 block-alert">{vacationError}</div>}
-          {vacationSuccess && <div className="badge badge-success mb-4 block-alert">{vacationSuccess}</div>}
-
-          <form onSubmit={handleVacationSubmit} className="vacation-form" style={{ display: "flex", gap: "12px", alignItems: "flex-end", flexWrap: "wrap" }}>
-            <div className="form-group" style={{ flex: 1, minWidth: "150px", marginBottom: 0 }}>
-              <label className="form-label">Start Date</label>
-              <input
-                type="date"
-                className="form-input"
-                value={vacationStart}
-                onChange={(e) => setVacationStart(e.target.value)}
-                disabled={vacationSubmitting}
-                required
-              />
-            </div>
-            <div className="form-group" style={{ flex: 1, minWidth: "150px", marginBottom: 0 }}>
-              <label className="form-label">End Date</label>
-              <input
-                type="date"
-                className="form-input"
-                value={vacationEnd}
-                onChange={(e) => setVacationEnd(e.target.value)}
-                disabled={vacationSubmitting}
-                required
-              />
-            </div>
-            <button
-              type="submit"
-              className="btn btn-secondary"
-              style={{ height: "42px", padding: "0 20px", minWidth: "120px" }}
-              disabled={vacationSubmitting}
-            >
-              {vacationSubmitting ? "Saving..." : "Go on Vacation ✈️"}
-            </button>
-          </form>
-
-          <div className="active-vacations-list mt-4">
-            <h4>Scheduled Vacation Ranges</h4>
-            {vacations.length === 0 ? (
-              <p className="text-muted" style={{ fontSize: "13px", marginTop: "6px" }}>No vacation periods scheduled yet.</p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
-                {vacations.map((v) => {
-                  const start = new Date(v.startDate);
-                  const end = new Date(v.endDate);
-                  const now = new Date();
-                  now.setHours(0, 0, 0, 0);
-                  const isPast = end < now;
-                  const isActive = start <= now && end >= now;
-
-                  return (
-                    <div key={v.id} className="flex-between p-3" style={{ background: "var(--cream)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-light)" }}>
-                      <div>
-                        <strong>{start.toLocaleDateString()} to {end.toLocaleDateString()}</strong>
-                        <div style={{ fontSize: "11px", marginTop: "2px" }}>
-                          {isPast ? (
-                            <span style={{ color: "var(--muted)" }}>Completed</span>
-                          ) : isActive ? (
-                            <span style={{ color: "var(--green)", fontWeight: "bold" }}>Active Now</span>
-                          ) : (
-                            <span style={{ color: "var(--amber)", fontWeight: "bold" }}>Upcoming</span>
-                          )}
-                        </div>
-                      </div>
-                      {!isPast && (
-                        <button
-                          type="button"
-                          onClick={() => handleCancelVacation(v.id)}
-                          disabled={vacationSubmitting}
-                          className="btn btn-ghost"
-                          style={{ padding: "4px 10px", fontSize: "11px", color: "var(--error)" }}
-                        >
-                          {isActive ? "Resume Early" : "Cancel"}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderWalletTab = () => (
-    <div className="dashboard-grid">
-      {/* LEFT COLUMN: WALLET BALANCE & DEPOSIT FORM */}
-      <div className="grid-column">
-        {/* Wallet Card */}
-        <div className="card wallet-card">
-          <div className="wallet-header">
-            <span className="label">WALLET BALANCE</span>
-            <span className="balance">₹{wallet?.balance.toFixed(2) || "0.00"}</span>
-          </div>
-
-          <form onSubmit={handleRechargeSubmit} className="recharge-form mt-4">
-            <h3>Request Balance Recharge</h3>
-            {rechargeError && <div className="badge badge-danger mb-4 block-alert">{rechargeError}</div>}
-            {rechargeSuccess && <div className="badge badge-success mb-4 block-alert">Recharge request submitted! Pending approval.</div>}
-
-            <div className="form-group">
-              <label className="form-label" htmlFor="amount">Recharge Amount (₹)</label>
-              <input
-                id="amount"
-                type="number"
-                className="form-input"
-                placeholder="e.g. 500"
-                value={rechargeAmount}
-                onChange={(e) => setRechargeAmount(e.target.value)}
-                disabled={rechargeSubmitting}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" htmlFor="receipt-file">Upload Payment Screenshot</label>
-              <input
-                id="receipt-file"
-                type="file"
-                accept="image/*"
-                className="form-input"
-                onChange={(e) => setScreenshotFile(e.target.files?.[0] || null)}
-                disabled={rechargeSubmitting}
-                required
-              />
-              <span className="file-hint text-muted">UPI, GPay, or NetBanking receipt screenshot</span>
-            </div>
-
-            <button type="submit" className="btn btn-secondary w-full" disabled={rechargeSubmitting}>
-              {rechargeSubmitting ? "Submitting..." : "Submit Receipt Screenshot"}
-            </button>
-          </form>
-        </div>
-      </div>
-
-      {/* RIGHT COLUMN: RECHARGE HISTORY & WALLET TRANSACTIONS LOG */}
-      <div className="grid-column">
-        {/* Recharge Requests */}
-        <div className="card recharge-requests-card">
-          <h3>Recent Recharge Requests</h3>
-          <div className="requests-table-wrapper mt-4">
-            {paymentRequests.length === 0 ? (
-              <p className="text-muted text-center py-4">No recharge requests yet.</p>
-            ) : (
-              <table className="dashboard-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Amount</th>
-                    <th>Receipt</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paymentRequests.map((req) => (
-                    <tr key={req.id}>
-                      <td>{new Date(req.createdAt).toLocaleDateString()}</td>
-                      <td><strong>₹{req.amount.toFixed(2)}</strong></td>
-                      <td>
-                        <a href={req.screenshotUrl} target="_blank" rel="noreferrer" className="receipt-link">
-                          View Receipt 🔗
-                        </a>
-                      </td>
-                      <td>
-                        <span className={`badge badge-${req.status === "APPROVED" ? "success" : req.status === "PENDING" ? "warning" : "danger"}`}>
-                          {req.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-
-        {/* Audit Transactions Log */}
-        <div className="card transactions-card">
-          <h3>Audited Wallet Transactions</h3>
-          <div className="transactions-list mt-4">
-            {!wallet || wallet.transactions.length === 0 ? (
-              <p className="text-muted text-center py-4">No transactions recorded yet.</p>
-            ) : (
-              wallet.transactions.map((tx) => (
-                <div key={tx.id} className="tx-item flex-between">
-                  <div className="tx-info">
-                    <strong>{tx.description || tx.source}</strong>
-                    <div className="tx-time text-muted">
-                      {new Date(tx.timestamp).toLocaleDateString()}
-                    </div>
-                  </div>
-                  <div className={`tx-amount ${tx.changeAmount > 0 ? "positive" : "negative"}`}>
-                    {tx.changeAmount > 0 ? "+" : ""}₹{tx.changeAmount.toFixed(2)}
-                    <div className="audit-trail">
-                      Bal: ₹{tx.beforeBalance.toFixed(2)} → ₹{tx.afterBalance.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderHistoryTab = () => (
-    <div className="dashboard-grid">
-      {/* LEFT COLUMN: SYSTEM NOTIFICATIONS */}
-      <div className="grid-column">
-        {/* Notifications Panel */}
-        <div className="card notifications-card">
-          <h3>Notifications & Silent Delivery logs</h3>
-          <div className="notifications-list mt-4">
-            {notifications.length === 0 ? (
-              <p className="text-muted text-center py-4">No notifications yet.</p>
-            ) : (
-              notifications.map((notif) => (
-                <div key={notif.id} className={`notif-item ${notif.type.toLowerCase()}`}>
-                  <div className="notif-header">
-                    <strong>{notif.title}</strong>
-                    <span className="notif-time">
-                      {new Date(notif.timestamp).toLocaleDateString()} at{" "}
-                      {new Date(notif.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                  <p className="notif-msg">{notif.message}</p>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* RIGHT COLUMN: COMPLETED DELIVERIES HISTORY */}
-      <div className="grid-column">
-        {/* Delivery History */}
-        <div className="card delivery-history-card">
-          <h3>Delivery History</h3>
-          <div className="transactions-list mt-4">
-            {deliveries.length === 0 ? (
-              <p className="text-muted text-center py-4">No delivery history records yet.</p>
-            ) : (
-              deliveries.map((del) => {
-                let items: any[] = [];
-                try { items = JSON.parse(del.itemsSnapshot); } catch {}
-                return (
-                  <div key={del.id} className="tx-item flex-between">
-                    <div className="tx-info">
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <strong>{new Date(del.deliveredAt).toLocaleDateString()}</strong>
-                        <span className={`badge badge-${del.status === "DELIVERED" ? "success" : "danger"}`}>
-                          {del.status === "DELIVERED" ? "Delivered ✓" : "Issue Reported"}
-                        </span>
-                      </div>
-                      {del.issueNote && (
-                        <div className="text-muted" style={{ fontSize: "12px", marginTop: "2px", color: "#b91c1c" }}>
-                          Note: {del.issueNote}
-                        </div>
-                      )}
-                      <div className="tx-time text-muted" style={{ marginTop: "4px" }}>
-                        {items.length > 0
-                          ? items.map((i: any) => `${i.quantity}x ${i.name} (${i.size})`).join(", ")
-                          : "No items listed"}
-                      </div>
-                    </div>
-                    <div className="tx-amount negative" style={{ textAlign: "right" }}>
-                      -₹{del.totalCost.toFixed(2)}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
   return (
     <main className="dashboard-main container">
       {/* Top Welcome Message */}
@@ -860,65 +357,488 @@ export function CustomerDashboardClient({
         )}
       </section>
 
-      {/* Tab Menu Bar */}
-      <div className="tab-bar mt-4">
-        <button
-          className={`tab-btn ${activeTab === "deliveries" ? "active" : ""}`}
-          onClick={() => setActiveTab("deliveries")}
-        >
-          📋 Daily Deliveries
-        </button>
-        <button
-          className={`tab-btn ${activeTab === "wallet" ? "active" : ""}`}
-          onClick={() => setActiveTab("wallet")}
-        >
-          💳 Wallet & Recharge
-        </button>
-        <button
-          className={`tab-btn ${activeTab === "history" ? "active" : ""}`}
-          onClick={() => setActiveTab("history")}
-        >
-          🔔 Notifications & Logs
-        </button>
+      <div className="dashboard-grid">
+        {/* LEFT COLUMN: WALLET & NOTIFICATIONS */}
+        <div className="grid-column">
+          {/* Wallet Card */}
+          <div className="card wallet-card">
+            <div className="wallet-header">
+              <span className="label">WALLET BALANCE</span>
+              <span className="balance">₹{wallet?.balance.toFixed(2) || "0.00"}</span>
+            </div>
+
+            <form onSubmit={handleRechargeSubmit} className="recharge-form mt-4">
+              <h3>Request Balance Recharge</h3>
+              {rechargeError && <div className="badge badge-danger mb-4 block-alert">{rechargeError}</div>}
+              {rechargeSuccess && <div className="badge badge-success mb-4 block-alert">Recharge request submitted! Pending approval.</div>}
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="amount">Recharge Amount (₹)</label>
+                <input
+                  id="amount"
+                  type="number"
+                  className="form-input"
+                  placeholder="e.g. 500"
+                  value={rechargeAmount}
+                  onChange={(e) => setRechargeAmount(e.target.value)}
+                  disabled={rechargeSubmitting}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="receipt-file">Upload Payment Screenshot</label>
+                <input
+                  id="receipt-file"
+                  type="file"
+                  accept="image/*"
+                  className="form-input"
+                  onChange={(e) => setScreenshotFile(e.target.files?.[0] || null)}
+                  disabled={rechargeSubmitting}
+                  required
+                />
+                <span className="file-hint text-muted">UPI, GPay, or NetBanking receipt screenshot</span>
+              </div>
+
+              <button type="submit" className="btn btn-secondary w-full" disabled={rechargeSubmitting}>
+                {rechargeSubmitting ? "Submitting..." : "Submit Receipt Screenshot"}
+              </button>
+            </form>
+          </div>
+
+          {/* Notifications Panel */}
+          <div className="card notifications-card">
+            <h3>Notifications & Silent Delivery logs</h3>
+            <div className="notifications-list mt-4">
+              {notifications.length === 0 ? (
+                <p className="text-muted text-center py-4">No notifications yet.</p>
+              ) : (
+                notifications.map((notif) => (
+                  <div key={notif.id} className={`notif-item ${notif.type.toLowerCase()}`}>
+                    <div className="notif-header">
+                      <strong>{notif.title}</strong>
+                      <span className="notif-time">
+                        {new Date(notif.timestamp).toLocaleDateString()} at{" "}
+                        {new Date(notif.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <p className="notif-msg">{notif.message}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: SUBSCRIPTIONS, OVERRIDES & VACATIONS */}
+        <div className="grid-column">
+          {/* Active Daily Item List Card */}
+          <div className="card active-daily-items-card" style={{ borderLeft: "5px solid var(--green)" }}>
+            <h3>My Active Daily Items</h3>
+            <p className="text-muted mb-4">Quick summary of what you have subscribed to and what is coming tomorrow.</p>
+
+            <div className="delivery-summary-split">
+              {/* Regular Daily Baseline */}
+              <div className="baseline-list-box" style={{ background: "var(--cream)", padding: "16px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-light)" }}>
+                <h4 style={{ color: "var(--green-dark)", borderBottom: "2px solid var(--green-light)", paddingBottom: "8px", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
+                  📋 Regular Daily Baseline
+                </h4>
+                {products.filter(p => subQuantities[p.id] > 0).length === 0 ? (
+                  <p className="text-muted" style={{ fontSize: "13px" }}>No items in your regular daily list. Use the "Modify Recurring Delivery Schedule" form below to subscribe to products.</p>
+                ) : (
+                  <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {products.filter(p => subQuantities[p.id] > 0).map(p => (
+                      <li key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "14px" }}>
+                        <span>{p.emoji} {p.name} <span className="text-muted" style={{ fontSize: "12px" }}>({p.size})</span></span>
+                        <strong style={{ background: "var(--green-light)", color: "var(--green)", padding: "2px 8px", borderRadius: "12px", fontSize: "12px" }}>
+                          {subQuantities[p.id]} Qty
+                        </strong>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* Tomorrow's Active Delivery */}
+              <div className="tomorrow-list-box" style={{ background: "var(--cream)", padding: "16px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-light)" }}>
+                <h4 style={{ color: "var(--amber)", borderBottom: "2px solid var(--amber-light)", paddingBottom: "8px", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
+                  🚚 Tomorrow's Delivery
+                </h4>
+                {tomorrowPause ? (
+                  <div className="text-center py-2" style={{ color: "var(--error)", fontSize: "13px" }}>
+                    <strong>⏸️ Paused</strong>
+                    <p className="text-muted" style={{ fontSize: "11px", marginTop: "2px" }}>Tomorrow's delivery is paused by you.</p>
+                  </div>
+                ) : isTomorrowOnVacation() ? (
+                  <div className="text-center py-2" style={{ color: "var(--green)", fontSize: "13px" }}>
+                    <strong>✈️ Vacation Mode Active</strong>
+                    <p className="text-muted" style={{ fontSize: "11px", marginTop: "2px" }}>Pause scheduled via vacation planner.</p>
+                  </div>
+                ) : products.filter(p => overrideQuantities[p.id] > 0).length === 0 ? (
+                  <p className="text-muted" style={{ fontSize: "13px" }}>No items scheduled for tomorrow.</p>
+                ) : (
+                  <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {products.filter(p => overrideQuantities[p.id] > 0).map(p => {
+                      const isOverridden = overrideQuantities[p.id] !== (subscriptionItems.find(item => item.productId === p.id)?.quantity || 0);
+                      return (
+                        <li key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "14px" }}>
+                          <span>
+                            {p.emoji} {p.name} <span className="text-muted" style={{ fontSize: "12px" }}>({p.size})</span>
+                            {isOverridden && <span style={{ color: "var(--amber)", marginLeft: "4px", fontSize: "10px" }} title="Overridden for tomorrow">*</span>}
+                          </span>
+                          <strong style={{ background: "var(--amber-light)", color: "var(--amber)", padding: "2px 8px", borderRadius: "12px", fontSize: "12px" }}>
+                            {overrideQuantities[p.id]} Qty
+                          </strong>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Tomorrow's Order Override Card */}
+          <div className="card tomorrow-delivery-card" style={{ borderLeft: "5px solid var(--amber)" }}>
+            <div className="flex-between">
+              <h3>Tomorrow's Delivery Override</h3>
+              <span className={`badge ${isCutoffPassed() ? "badge-danger" : "badge-success"}`}>
+                {isCutoffPassed() ? "🔒 Locked (After 10 PM)" : "🔓 Open for edits"}
+              </span>
+            </div>
+            <p className="text-muted mb-4">Modify tomorrow's quantities only. Does not overwrite your recurring schedule.</p>
+
+            {overrideError && <div className="badge badge-danger mb-4 block-alert">{overrideError}</div>}
+            {overrideSuccess && <div className="badge badge-success mb-4 block-alert">Tomorrow's order settings saved!</div>}
+
+            {/* Pause Toggle */}
+            <div className="pause-toggle-row flex-between mb-4 p-3" style={{ background: "var(--cream)", borderRadius: "var(--radius-sm)", border: "1px dashed var(--border)" }}>
+              <div>
+                <strong>Pause Tomorrow's Delivery</strong>
+                <div className="text-muted" style={{ fontSize: "11px" }}>Skip delivery for tomorrow without charging your wallet</div>
+              </div>
+              <button
+                type="button"
+                onClick={handlePauseToggle}
+                disabled={pauseSubmitting || isCutoffPassed()}
+                className={`btn ${tomorrowPause ? "btn-secondary" : "btn-ghost"}`}
+                style={{ padding: "6px 14px", fontSize: "12px" }}
+              >
+                {pauseSubmitting ? "Updating..." : tomorrowPause ? "⏸️ Paused (Resume)" : "▶️ Active (Pause)"}
+              </button>
+            </div>
+
+            {!tomorrowPause && (
+              <form onSubmit={handleOverrideSubmit}>
+                <div className="products-list">
+                  {products.map((p) => {
+                    const recurring = subscriptionItems.find((item) => item.productId === p.id);
+                    const recurringQty = recurring ? recurring.quantity : 0;
+                    const hasOverride = overrideQuantities[p.id] !== recurringQty;
+
+                    return (
+                      <div key={p.id} className="sub-product-row flex-between">
+                        <div className="product-info">
+                          <span className="emoji">{p.emoji}</span>
+                          <div>
+                            <strong>{p.name}</strong>
+                            <div className="size text-muted">
+                              {p.size} • ₹{p.price.toFixed(2)}
+                              {hasOverride && (
+                                <span className="badge badge-warning" style={{ marginLeft: "8px", fontSize: "9px", padding: "2px 6px" }}>
+                                  Modified for Tomorrow
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="quantity-selector">
+                          <button
+                            type="button"
+                            className="qty-btn"
+                            onClick={() => handleOverrideQtyChange(p.id, overrideQuantities[p.id] - 1)}
+                            disabled={overrideSubmitting || isCutoffPassed()}
+                          >
+                            -
+                          </button>
+                          <span className="qty-val">{overrideQuantities[p.id]}</span>
+                          <button
+                            type="button"
+                            className="qty-btn"
+                            onClick={() => handleOverrideQtyChange(p.id, overrideQuantities[p.id] + 1)}
+                            disabled={overrideSubmitting || isCutoffPassed()}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <button
+                  type="submit"
+                  className="btn btn-primary w-full mt-4"
+                  disabled={overrideSubmitting || isCutoffPassed()}
+                >
+                  {overrideSubmitting ? "Saving Tomorrow's Override..." : "Save Tomorrow's Delivery Only"}
+                </button>
+              </form>
+            )}
+
+            {tomorrowPause && (
+              <div className="text-center py-6 text-muted" style={{ background: "var(--cream)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-light)" }}>
+                🚫 Tomorrow's delivery is paused. Reactivate by clicking "Resume" above.
+              </div>
+            )}
+          </div>
+
+          {/* Vacation Mode Planner */}
+          <div className="card vacation-card" style={{ borderLeft: "5px solid var(--green)" }}>
+            <h3>Vacation Mode Scheduler</h3>
+            <p className="text-muted mb-4">Pause all deliveries for multiple days. Wallet will not be charged.</p>
+
+            {vacationError && <div className="badge badge-danger mb-4 block-alert">{vacationError}</div>}
+            {vacationSuccess && <div className="badge badge-success mb-4 block-alert">{vacationSuccess}</div>}
+
+            <form onSubmit={handleVacationSubmit} style={{ display: "flex", gap: "12px", alignItems: "flex-end", flexWrap: "wrap" }}>
+              <div className="form-group" style={{ flex: 1, minWidth: "150px", marginBottom: 0 }}>
+                <label className="form-label">Start Date</label>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={vacationStart}
+                  onChange={(e) => setVacationStart(e.target.value)}
+                  disabled={vacationSubmitting}
+                  required
+                />
+              </div>
+              <div className="form-group" style={{ flex: 1, minWidth: "150px", marginBottom: 0 }}>
+                <label className="form-label">End Date</label>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={vacationEnd}
+                  onChange={(e) => setVacationEnd(e.target.value)}
+                  disabled={vacationSubmitting}
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                className="btn btn-secondary"
+                style={{ height: "42px", padding: "0 20px", minWidth: "120px" }}
+                disabled={vacationSubmitting}
+              >
+                {vacationSubmitting ? "Saving..." : "Go on Vacation ✈️"}
+              </button>
+            </form>
+
+            <div className="active-vacations-list mt-4">
+              <h4>Scheduled Vacation Ranges</h4>
+              {vacations.length === 0 ? (
+                <p className="text-muted" style={{ fontSize: "13px", marginTop: "6px" }}>No vacation periods scheduled yet.</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
+                  {vacations.map((v) => {
+                    const start = new Date(v.startDate);
+                    const end = new Date(v.endDate);
+                    const now = new Date();
+                    now.setHours(0, 0, 0, 0);
+                    const isPast = end < now;
+                    const isActive = start <= now && end >= now;
+
+                    return (
+                      <div key={v.id} className="flex-between p-3" style={{ background: "var(--cream)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-light)" }}>
+                        <div>
+                          <strong>{start.toLocaleDateString()} to {end.toLocaleDateString()}</strong>
+                          <div style={{ fontSize: "11px", marginTop: "2px" }}>
+                            {isPast ? (
+                              <span style={{ color: "var(--muted)" }}>Completed</span>
+                            ) : isActive ? (
+                              <span style={{ color: "var(--green)", fontWeight: "bold" }}>Active Now</span>
+                            ) : (
+                              <span style={{ color: "var(--amber)", fontWeight: "bold" }}>Upcoming</span>
+                            )}
+                          </div>
+                        </div>
+                        {!isPast && (
+                          <button
+                            type="button"
+                            onClick={() => handleCancelVacation(v.id)}
+                            disabled={vacationSubmitting}
+                            className="btn btn-ghost"
+                            style={{ padding: "4px 10px", fontSize: "11px", color: "var(--error)" }}
+                          >
+                            {isActive ? "Resume Early" : "Cancel"}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Subscription Manager */}
+          <div className="card subscription-card">
+            <h3>Modify Recurring Delivery Schedule</h3>
+            <p className="text-muted mb-4">Set the baseline quantity of each dairy item you want delivered daily.</p>
+            {subSuccess && <div className="badge badge-success mb-4 block-alert">Subscription schedule updated successfully!</div>}
+
+            <form onSubmit={handleSubSubmit}>
+              <div className="products-list">
+                {products.map((p) => (
+                  <div key={p.id} className="sub-product-row flex-between">
+                    <div className="product-info">
+                      <span className="emoji">{p.emoji}</span>
+                      <div>
+                        <strong>{p.name}</strong>
+                        <div className="size text-muted">{p.size} • ₹{p.price.toFixed(2)}</div>
+                      </div>
+                    </div>
+                    <div className="quantity-selector">
+                      <button
+                        type="button"
+                        className="qty-btn"
+                        onClick={() => handleQtyChange(p.id, subQuantities[p.id] - 1)}
+                        disabled={subSubmitting}
+                      >
+                        -
+                      </button>
+                      <span className="qty-val">{subQuantities[p.id]}</span>
+                      <button
+                        type="button"
+                        className="qty-btn"
+                        onClick={() => handleQtyChange(p.id, subQuantities[p.id] + 1)}
+                        disabled={subSubmitting}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button type="submit" className="btn btn-primary w-full mt-4" disabled={subSubmitting}>
+                {subSubmitting ? "Saving Baseline..." : "Save Baseline Schedule"}
+              </button>
+            </form>
+          </div>
+
+          {/* Recharge Requests */}
+          <div className="card recharge-requests-card">
+            <h3>Recent Recharge Requests</h3>
+            <div className="requests-table-wrapper mt-4">
+              {paymentRequests.length === 0 ? (
+                <p className="text-muted text-center py-4">No recharge requests yet.</p>
+              ) : (
+                <table className="dashboard-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Amount</th>
+                      <th>Receipt</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paymentRequests.map((req) => (
+                      <tr key={req.id}>
+                        <td>{new Date(req.createdAt).toLocaleDateString()}</td>
+                        <td><strong>₹{req.amount.toFixed(2)}</strong></td>
+                        <td>
+                          <a href={req.screenshotUrl} target="_blank" rel="noreferrer" className="receipt-link">
+                            View Receipt 🔗
+                          </a>
+                        </td>
+                        <td>
+                          <span className={`badge badge-${req.status === "APPROVED" ? "success" : req.status === "PENDING" ? "warning" : "danger"}`}>
+                            {req.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+
+          {/* Audit Transactions Log */}
+          <div className="card transactions-card">
+            <h3>Audited Wallet Transactions</h3>
+            <div className="transactions-list mt-4">
+              {!wallet || wallet.transactions.length === 0 ? (
+                <p className="text-muted text-center py-4">No transactions recorded yet.</p>
+              ) : (
+                wallet.transactions.map((tx) => (
+                  <div key={tx.id} className="tx-item flex-between">
+                    <div className="tx-info">
+                      <strong>{tx.description || tx.source}</strong>
+                      <div className="tx-time text-muted">
+                        {new Date(tx.timestamp).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <div className={`tx-amount ${tx.changeAmount > 0 ? "positive" : "negative"}`}>
+                      {tx.changeAmount > 0 ? "+" : ""}₹{tx.changeAmount.toFixed(2)}
+                      <div className="audit-trail">
+                        Bal: ₹{tx.beforeBalance.toFixed(2)} → ₹{tx.afterBalance.toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Delivery History */}
+          <div className="card delivery-history-card">
+            <h3>Delivery History</h3>
+            <div className="transactions-list mt-4">
+              {deliveries.length === 0 ? (
+                <p className="text-muted text-center py-4">No delivery history records yet.</p>
+              ) : (
+                deliveries.map((del) => {
+                  let items: any[] = [];
+                  try { items = JSON.parse(del.itemsSnapshot); } catch { }
+                  return (
+                    <div key={del.id} className="tx-item flex-between">
+                      <div className="tx-info">
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <strong>{new Date(del.deliveredAt).toLocaleDateString()}</strong>
+                          <span className={`badge badge-${del.status === "DELIVERED" ? "success" : "danger"}`}>
+                            {del.status === "DELIVERED" ? "Delivered ✓" : "Issue Reported"}
+                          </span>
+                        </div>
+                        {del.issueNote && (
+                          <div className="text-muted" style={{ fontSize: "12px", marginTop: "2px", color: "#b91c1c" }}>
+                            Note: {del.issueNote}
+                          </div>
+                        )}
+                        <div className="tx-time text-muted" style={{ marginTop: "4px" }}>
+                          {items.length > 0
+                            ? items.map((i: any) => `${i.quantity}x ${i.name} (${i.size})`).join(", ")
+                            : "No items listed"}
+                        </div>
+                      </div>
+                      <div className="tx-amount negative" style={{ textAlign: "right" }}>
+                        -₹{del.totalCost.toFixed(2)}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {activeTab === "deliveries" && renderDeliveriesTab()}
-      {activeTab === "wallet" && renderWalletTab()}
-      {activeTab === "history" && renderHistoryTab()}
       <style jsx>{`
         .dashboard-main {
           padding-top: 24px;
           padding-bottom: 80px;
-        }
-        .tab-bar {
-          display: flex;
-          gap: 8px;
-          border-bottom: 1px solid var(--border);
-          margin-bottom: 24px;
-          padding-bottom: 2px;
-          overflow-x: auto;
-          -webkit-overflow-scrolling: touch;
-        }
-        .tab-btn {
-          padding: 10px 16px;
-          border: none;
-          background: transparent;
-          font-weight: 600;
-          color: var(--muted);
-          cursor: pointer;
-          border-bottom: 3px solid transparent;
-          transition: all 0.2s ease;
-          white-space: nowrap;
-          font-size: 14px;
-        }
-        .tab-btn:hover {
-          color: var(--green);
-          background: var(--green-light);
-          border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-        }
-        .tab-btn.active {
-          color: var(--green);
-          border-bottom-color: var(--green);
         }
         .welcome-banner {
           background: linear-gradient(135deg, var(--white) 60%, var(--green-light) 100%);
