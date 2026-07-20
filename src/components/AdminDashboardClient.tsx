@@ -53,11 +53,64 @@ interface ReportItem {
   issueReported?: number;
 }
 
+interface CustomerStats {
+  total: number;
+  active: number;
+  inactive: number;
+  paused: number;
+  vacation: number;
+  cancelled: number;
+}
+interface MilkSaleItem {
+  name: string;
+  qty: number;
+}
+interface RevenueStats {
+  today: number;
+  yesterday: number;
+  weekly: number;
+  monthly: number;
+  total: number;
+}
+interface DeliveryStats {
+  total: number;
+  completed: number;
+  pending: number;
+  failed: number;
+  completionPct: number;
+}
+interface WalletCollection {
+  total: number;
+  rechargesToday: number;
+  deductionsToday: number;
+}
+interface CustomerGrowthStats {
+  today: number;
+  weekly: number;
+  monthly: number;
+}
+interface DeliveryBoyPerfRow {
+  name: string;
+  assignedCount: number;
+  completedCount: number;
+  pendingCount: number;
+  issueCount: number;
+  completionPct: number;
+  routeName: string;
+}
+
 interface ReportsSuite {
   revenue: { date: string; total: number }[];
   collection: { date: string; total: number }[];
   customerGrowth: { date: string; count: number }[];
   deliveryPerformance: { date: string; delivered: number; issueReported: number }[];
+  customerStats: CustomerStats;
+  milkSales: MilkSaleItem[];
+  revenueStats: RevenueStats;
+  deliveryStats: DeliveryStats;
+  walletCollection: WalletCollection;
+  customerGrowthStats: CustomerGrowthStats;
+  deliveryBoyPerformance: DeliveryBoyPerfRow[];
 }
 
 interface AdminDashboardProps {
@@ -71,7 +124,7 @@ interface AdminDashboardProps {
   products: Product[];
   recentTransactions: TransactionItem[];
   allUsers: UserItem[];
-  reports?: ReportsSuite;
+  reports: ReportsSuite;
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -96,7 +149,7 @@ export function AdminDashboardClient({
   products,
   recentTransactions,
   allUsers,
-  reports = { revenue: [], collection: [], customerGrowth: [], deliveryPerformance: [] },
+  reports,
 }: AdminDashboardProps) {
   // User Management state
   const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "reports">("dashboard");
@@ -369,28 +422,125 @@ export function AdminDashboardClient({
 
       {/* ─── REPORTS SUITE TAB ─── */}
       {activeTab === "reports" && (
-        <div className="dashboard-grid mt-4">
-          {/* Revenue Report Table */}
-          <div className="grid-column">
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          
+          {/* A. CUSTOMER ANALYTICS & GROWTH SUMMARY */}
+          <div className="card mt-4">
+            <h3 style={{ borderBottom: "2px solid var(--green-light)", paddingBottom: "8px", marginBottom: "16px", color: "var(--green)" }}>
+              👥 Customer Directory Analytics & Growth
+            </h3>
+            <div className="stats-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginBottom: "20px" }}>
+              <div className="card text-center" style={{ background: "var(--cream)", padding: "12px" }}>
+                <span className="stat-title" style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase" }}>New Today</span>
+                <span className="stat-value" style={{ fontSize: "24px", color: "var(--green)", fontWeight: 700, display: "block" }}>+{reports.customerGrowthStats.today}</span>
+              </div>
+              <div className="card text-center" style={{ background: "var(--cream)", padding: "12px" }}>
+                <span className="stat-title" style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase" }}>This Week</span>
+                <span className="stat-value" style={{ fontSize: "24px", color: "var(--green)", fontWeight: 700, display: "block" }}>+{reports.customerGrowthStats.weekly}</span>
+              </div>
+              <div className="card text-center" style={{ background: "var(--cream)", padding: "12px" }}>
+                <span className="stat-title" style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase" }}>This Month</span>
+                <span className="stat-value" style={{ fontSize: "24px", color: "var(--green)", fontWeight: 700, display: "block" }}>+{reports.customerGrowthStats.monthly}</span>
+              </div>
+            </div>
+
+            <div className="requests-table-wrapper">
+              <table className="dashboard-table" style={{ fontSize: "13px" }}>
+                <thead>
+                  <tr>
+                    <th>Total Customers</th>
+                    <th>Active Accounts</th>
+                    <th>Suspended / Inactive</th>
+                    <th>Paused Today</th>
+                    <th>Vacation Pause</th>
+                    <th>Cancelled Subscriptions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>{reports.customerStats.total} Clients</strong></td>
+                    <td><span className="badge badge-success">{reports.customerStats.active} Active</span></td>
+                    <td><span className="badge badge-danger">{reports.customerStats.inactive} Suspended</span></td>
+                    <td><span className="badge badge-warning">{reports.customerStats.paused} Paused</span></td>
+                    <td><span className="badge badge-warning">{reports.customerStats.vacation} Vacation</span></td>
+                    <td><span className="badge badge-info">{reports.customerStats.cancelled} Cancelled</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* B. REVENUE & COLLECTIONS SUMMARY */}
+          <div className="card">
+            <h3 style={{ borderBottom: "2px solid var(--green-light)", paddingBottom: "8px", marginBottom: "16px", color: "var(--green)" }}>
+              💰 Revenue Summary & Collections
+            </h3>
+            <div className="stats-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)", marginBottom: "20px" }}>
+              <div className="card text-center" style={{ background: "var(--cream)", padding: "10px" }}>
+                <span className="stat-title" style={{ fontSize: "10px", color: "var(--muted)" }}>Today</span>
+                <span style={{ fontSize: "18px", color: "var(--green)", fontWeight: 700, display: "block" }}>₹{reports.revenueStats.today.toFixed(2)}</span>
+              </div>
+              <div className="card text-center" style={{ background: "var(--cream)", padding: "10px" }}>
+                <span className="stat-title" style={{ fontSize: "10px", color: "var(--muted)" }}>Yesterday</span>
+                <span style={{ fontSize: "18px", color: "var(--green)", fontWeight: 700, display: "block" }}>₹{reports.revenueStats.yesterday.toFixed(2)}</span>
+              </div>
+              <div className="card text-center" style={{ background: "var(--cream)", padding: "10px" }}>
+                <span className="stat-title" style={{ fontSize: "10px", color: "var(--muted)" }}>Weekly</span>
+                <span style={{ fontSize: "18px", color: "var(--green)", fontWeight: 700, display: "block" }}>₹{reports.revenueStats.weekly.toFixed(2)}</span>
+              </div>
+              <div className="card text-center" style={{ background: "var(--cream)", padding: "10px" }}>
+                <span className="stat-title" style={{ fontSize: "10px", color: "var(--muted)" }}>Monthly</span>
+                <span style={{ fontSize: "18px", color: "var(--green)", fontWeight: 700, display: "block" }}>₹{reports.revenueStats.monthly.toFixed(2)}</span>
+              </div>
+              <div className="card text-center" style={{ background: "var(--cream)", padding: "10px" }}>
+                <span className="stat-title" style={{ fontSize: "10px", color: "var(--muted)" }}>Total Revenue</span>
+                <span style={{ fontSize: "18px", color: "var(--green)", fontWeight: 700, display: "block" }}>₹{reports.revenueStats.total.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div className="requests-table-wrapper">
+              <table className="dashboard-table" style={{ fontSize: "13px" }}>
+                <thead>
+                  <tr>
+                    <th>Today's Recharges Approval Cashflow</th>
+                    <th>Today's Successful Delivery Deductions</th>
+                    <th>Global Assets Managed (Prepaid Wallets Balance Sum)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong style={{ color: "var(--green)" }}>+₹{reports.walletCollection.rechargesToday.toFixed(2)} Approved</strong></td>
+                    <td><strong style={{ color: "var(--error)" }}>-₹{reports.walletCollection.deductionsToday.toFixed(2)} Deducted</strong></td>
+                    <td><strong style={{ color: "#2563eb" }}>₹{reports.walletCollection.total.toFixed(2)} Prepaid Balance</strong></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* C. SALES & INVENTORY REQUIREMENT */}
+          <div className="dashboard-grid mt-0">
+            {/* Today's Products Sold */}
             <div className="card">
-              <h3>💰 Daily Revenue Report (Last 30 Days)</h3>
-              <p className="text-muted mb-4">Total wallet deductions from completed daily deliveries.</p>
+              <h3 style={{ borderBottom: "2px solid var(--green-light)", paddingBottom: "8px", marginBottom: "16px", color: "var(--green)" }}>
+                🥛 Today's Product Sales (Quantity)
+              </h3>
               <div className="requests-table-wrapper">
-                {reports.revenue.length === 0 ? (
-                  <p className="text-muted text-center py-4">No delivery revenue recorded in the last 30 days.</p>
+                {reports.milkSales.length === 0 ? (
+                  <p className="text-muted text-center py-6">No completed deliveries logged today.</p>
                 ) : (
-                  <table className="dashboard-table">
+                  <table className="dashboard-table" style={{ fontSize: "13px" }}>
                     <thead>
                       <tr>
-                        <th>Date</th>
-                        <th>Total Revenue</th>
+                        <th>Product / Item</th>
+                        <th>Sold Quantity</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {reports.revenue.map((row) => (
-                        <tr key={row.date}>
-                          <td>{row.date}</td>
-                          <td><strong style={{ color: "var(--green)" }}>₹{row.total.toFixed(2)}</strong></td>
+                      {reports.milkSales.map((sale, idx) => (
+                        <tr key={idx}>
+                          <td><strong>{sale.name}</strong></td>
+                          <td><span className="badge badge-success">{sale.qty} Packets / Units</span></td>
                         </tr>
                       ))}
                     </tbody>
@@ -399,26 +549,27 @@ export function AdminDashboardClient({
               </div>
             </div>
 
-            {/* Customer Growth Report Table */}
-            <div className="card mt-4">
-              <h3>📈 Customer Growth Report (Last 30 Days)</h3>
-              <p className="text-muted mb-4">New customer account registrations per day.</p>
+            {/* Tomorrow's Inventory Forecast */}
+            <div className="card">
+              <h3 style={{ borderBottom: "2px solid var(--green-light)", paddingBottom: "8px", marginBottom: "16px", color: "var(--green)" }}>
+                📦 Tomorrow's Required Inventory
+              </h3>
               <div className="requests-table-wrapper">
-                {reports.customerGrowth.length === 0 ? (
-                  <p className="text-muted text-center py-4">No new registrations in the last 30 days.</p>
+                {forecast.length === 0 ? (
+                  <p className="text-muted text-center py-6">No active subscriptions scheduled for tomorrow.</p>
                 ) : (
-                  <table className="dashboard-table">
+                  <table className="dashboard-table" style={{ fontSize: "13px" }}>
                     <thead>
                       <tr>
-                        <th>Date</th>
-                        <th>New Customers</th>
+                        <th>Product</th>
+                        <th>Required Quantity</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {reports.customerGrowth.map((row) => (
-                        <tr key={row.date}>
-                          <td>{row.date}</td>
-                          <td><span className="badge badge-info">+{row.count} Users</span></td>
+                      {forecast.map((item, idx) => (
+                        <tr key={idx}>
+                          <td><strong>{item.emoji} {item.productName} ({item.size})</strong></td>
+                          <td><span className="badge badge-info">{item.totalQuantity} Units</span></td>
                         </tr>
                       ))}
                     </tbody>
@@ -428,66 +579,97 @@ export function AdminDashboardClient({
             </div>
           </div>
 
-          {/* Right Column Reports */}
-          <div className="grid-column">
-            {/* Wallet Collection Report Table */}
-            <div className="card">
-              <h3>💳 Wallet Collection Report (Last 30 Days)</h3>
-              <p className="text-muted mb-4">Total verified prepaid wallet recharges collected per day.</p>
-              <div className="requests-table-wrapper">
-                {reports.collection.length === 0 ? (
-                  <p className="text-muted text-center py-4">No recharges collected in the last 30 days.</p>
-                ) : (
-                  <table className="dashboard-table">
-                    <thead>
-                      <tr>
-                        <th>Date</th>
-                        <th>Total Collection</th>
+          {/* D. DELIVERY BOYS PERFORMANCE REPORT */}
+          <div className="card">
+            <h3 style={{ borderBottom: "2px solid var(--green-light)", paddingBottom: "8px", marginBottom: "16px", color: "var(--green)" }}>
+              🚚 Delivery Boys Performance Tracker
+            </h3>
+            <div className="requests-table-wrapper">
+              {reports.deliveryBoyPerformance.length === 0 ? (
+                <p className="text-muted text-center py-6">No delivery personnel registered.</p>
+              ) : (
+                <table className="dashboard-table" style={{ fontSize: "13px" }}>
+                  <thead>
+                    <tr>
+                      <th>Delivery Partner</th>
+                      <th>Assigned Route</th>
+                      <th>Assigned Customers</th>
+                      <th>Delivered ✓</th>
+                      <th>Issues Reported ⚠️</th>
+                      <th>Pending Today</th>
+                      <th>Completion %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reports.deliveryBoyPerformance.map((dp, idx) => (
+                      <tr key={idx}>
+                        <td><strong>{dp.name}</strong></td>
+                        <td><span className="badge badge-info">📍 {dp.routeName}</span></td>
+                        <td>{dp.assignedCount} Customers</td>
+                        <td><span className="badge badge-success">{dp.completedCount} Done</span></td>
+                        <td><span className="badge badge-danger">{dp.issueCount} Issues</span></td>
+                        <td><span className="badge badge-warning">{dp.pendingCount} Pending</span></td>
+                        <td>
+                          <strong>{dp.completionPct}%</strong>
+                          <div className="progress-track" style={{ height: "4px", width: "100px", marginTop: "4px" }}>
+                            <div className="progress-fill" style={{ width: `${dp.completionPct}%`, height: "100%" }}></div>
+                          </div>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {reports.collection.map((row) => (
-                        <tr key={row.date}>
-                          <td>{row.date}</td>
-                          <td><strong style={{ color: "var(--green)" }}>₹{row.total.toFixed(2)}</strong></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+
+          {/* E. 30-DAY DAILY TRENDS FEED */}
+          <div className="dashboard-grid mt-0">
+            <div className="card">
+              <h3>📈 30-Day Revenue Trend</h3>
+              <div className="requests-table-wrapper" style={{ maxHeight: "250px", overflowY: "auto" }}>
+                <table className="dashboard-table" style={{ fontSize: "12px" }}>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Total Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reports.revenue.map((row) => (
+                      <tr key={row.date}>
+                        <td>{row.date}</td>
+                        <td><strong style={{ color: "var(--green)" }}>₹{row.total.toFixed(2)}</strong></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
 
-            {/* Delivery Performance Report Table */}
-            <div className="card mt-4">
-              <h3>🚚 Delivery Performance Report (Last 30 Days)</h3>
-              <p className="text-muted mb-4">Successful deliveries vs reported logistics issues.</p>
-              <div className="requests-table-wrapper">
-                {reports.deliveryPerformance.length === 0 ? (
-                  <p className="text-muted text-center py-4">No delivery records logged in the last 30 days.</p>
-                ) : (
-                  <table className="dashboard-table">
-                    <thead>
-                      <tr>
-                        <th>Date</th>
-                        <th>Delivered ✓</th>
-                        <th>Issues Reported ⚠️</th>
+            <div className="card">
+              <h3>💳 30-Day Wallet Collections</h3>
+              <div className="requests-table-wrapper" style={{ maxHeight: "250px", overflowY: "auto" }}>
+                <table className="dashboard-table" style={{ fontSize: "12px" }}>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Wallet Collection</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reports.collection.map((row) => (
+                      <tr key={row.date}>
+                        <td>{row.date}</td>
+                        <td><strong style={{ color: "var(--green)" }}>₹{row.total.toFixed(2)}</strong></td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {reports.deliveryPerformance.map((row) => (
-                        <tr key={row.date}>
-                          <td>{row.date}</td>
-                          <td><span className="badge badge-success">{row.delivered}</span></td>
-                          <td><span className="badge badge-danger">{row.issueReported}</span></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
+
         </div>
       )}
 
@@ -799,9 +981,21 @@ export function AdminDashboardClient({
         }
         .btn-outline:hover { background: var(--cream); }
 
+        .progress-track {
+          width: 100%;
+          height: 6px;
+          background: var(--border-light);
+          border-radius: 10px;
+          overflow: hidden;
+        }
+        .progress-fill {
+          height: 100%;
+          background: var(--green);
+          transition: width 0.4s ease;
+        }
         @media (max-width: 1000px) {
-          .stats-grid { grid-template-columns: repeat(2, 1fr); }
-          .dashboard-grid { grid-template-columns: 1fr; }
+          .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .dashboard-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
     </main>
