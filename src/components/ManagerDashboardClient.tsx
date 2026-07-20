@@ -32,6 +32,15 @@ interface Customer {
   status?: string | null;
   wallet: {
     balance: number;
+    transactions?: {
+      id: string;
+      beforeBalance: number;
+      afterBalance: number;
+      changeAmount: number;
+      source: string;
+      description: string | null;
+      timestamp: Date;
+    }[];
   } | null;
   subscriptions?: { status: string }[];
   routeAssignments?: {
@@ -112,6 +121,9 @@ export function ManagerDashboardClient({
   const [filterRoute, setFilterRoute] = useState("ALL");
   const [filterDelivery, setFilterDelivery] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
+
+  // Selected customer for wallet history popup modal
+  const [selectedHistoryCustomer, setSelectedHistoryCustomer] = useState<Customer | null>(null);
 
   const handleApprove = async (requestId: string) => {
     setSubmittingId(requestId);
@@ -789,9 +801,18 @@ export function ManagerDashboardClient({
                           )}
                         </td>
                         <td>
-                          <strong style={{ color: isLowBalance ? "var(--error)" : "var(--green)" }}>
-                            ₹{c.wallet?.balance.toFixed(2) || "0.00"}
-                          </strong>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                            <strong style={{ color: isLowBalance ? "var(--error)" : "var(--green)" }}>
+                              ₹{c.wallet?.balance.toFixed(2) || "0.00"}
+                            </strong>
+                            <button
+                              onClick={() => setSelectedHistoryCustomer(c)}
+                              className="btn btn-outline"
+                              style={{ padding: "4px 8px", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px" }}
+                            >
+                              📜 History
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -799,6 +820,81 @@ export function ManagerDashboardClient({
                 </tbody>
               </table>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── CUSTOMER WALLET TRANSACTION HISTORY MODAL ─── */}
+      {selectedHistoryCustomer && (
+        <div className="modal-overlay">
+          <div className="modal-content card" style={{ maxWidth: "650px", width: "90%" }}>
+            <div className="flex-between mb-3">
+              <h3 style={{ margin: 0, color: "var(--green)" }}>Wallet History & Deduction Logs</h3>
+              <button onClick={() => setSelectedHistoryCustomer(null)} className="close-btn" style={{ fontSize: "24px" }}>&times;</button>
+            </div>
+            
+            <div className="mb-4 p-3" style={{ background: "var(--cream)", borderRadius: "var(--radius-sm)", display: "flex", justifyContent: "space-between" }}>
+              <div>
+                <strong>Customer:</strong> {selectedHistoryCustomer.name} ({selectedHistoryCustomer.email})
+              </div>
+              <div>
+                <strong>Balance:</strong> <span style={{ color: "var(--green)", fontWeight: 700 }}>₹{selectedHistoryCustomer.wallet?.balance.toFixed(2) || "0.00"}</span>
+              </div>
+            </div>
+
+            <div className="requests-table-wrapper" style={{ maxHeight: "300px", overflowY: "auto" }}>
+              {!selectedHistoryCustomer.wallet?.transactions || selectedHistoryCustomer.wallet.transactions.length === 0 ? (
+                <p className="text-muted text-center py-6">No transaction logs recorded yet for this client.</p>
+              ) : (
+                <table className="dashboard-table" style={{ fontSize: "13px" }}>
+                  <thead>
+                    <tr>
+                      <th>Date & Time</th>
+                      <th>Source / Type</th>
+                      <th>Description</th>
+                      <th>Change</th>
+                      <th>Balance Transition</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedHistoryCustomer.wallet.transactions.map((tx) => {
+                      const formattedDate = new Date(tx.timestamp).toLocaleString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      });
+                      const isPositive = tx.changeAmount > 0;
+                      return (
+                        <tr key={tx.id}>
+                          <td>{formattedDate}</td>
+                          <td>
+                            <span className={`badge badge-${tx.source === "RECHARGE" ? "success" : tx.source === "DELIVERY_DEDUCTION" ? "danger" : "info"}`}>
+                              {tx.source}
+                            </span>
+                          </td>
+                          <td style={{ fontSize: "12px", maxWidth: "200px", whiteSpace: "normal", wordBreak: "break-word" }}>
+                            {tx.description || "-"}
+                          </td>
+                          <td style={{ color: isPositive ? "var(--green)" : "var(--error)", fontWeight: "bold" }}>
+                            {isPositive ? "+" : ""}₹{tx.changeAmount.toFixed(2)}
+                          </td>
+                          <td className="text-muted" style={{ fontSize: "11px" }}>
+                            ₹{tx.beforeBalance.toFixed(2)} → ₹{tx.afterBalance.toFixed(2)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="mt-4" style={{ textAlign: "right" }}>
+              <button onClick={() => setSelectedHistoryCustomer(null)} className="btn btn-primary" style={{ padding: "8px 20px" }}>
+                Close History Logs
+              </button>
+            </div>
           </div>
         </div>
       )}

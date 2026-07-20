@@ -49,7 +49,22 @@ export default async function ManagerDashboardPage() {
       address: true,
       status: true,
       wallet: {
-        select: { balance: true },
+        select: {
+          balance: true,
+          transactions: {
+            select: {
+              id: true,
+              beforeBalance: true,
+              afterBalance: true,
+              changeAmount: true,
+              source: true,
+              description: true,
+              timestamp: true,
+            },
+            orderBy: { timestamp: "desc" },
+            take: 20,
+          },
+        },
       },
       subscriptions: {
         select: { status: true },
