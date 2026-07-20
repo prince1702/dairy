@@ -516,6 +516,53 @@ export async function removeRouteAssignment(assignmentId: string) {
   }
 }
 
+// 12a. Manager updates an existing route (name & description)
+export async function updateRoute(routeId: string, name: string, description?: string) {
+  try {
+    const existing = await prisma.route.findFirst({
+      where: {
+        name,
+        id: { not: routeId },
+      },
+    });
+    if (existing) return { success: false, error: "Another route with this name already exists." };
+
+    const route = await prisma.route.update({
+      where: { id: routeId },
+      data: {
+        name,
+        description: description || null,
+      },
+    });
+
+    revalidatePath("/manager");
+    revalidatePath("/subadmin");
+    revalidatePath("/delivery");
+    return { success: true, route };
+  } catch (err: any) {
+    console.error("updateRoute error:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+// 12b. Manager deletes a route (cascades assignments)
+export async function deleteRoute(routeId: string) {
+  try {
+    await prisma.route.delete({
+      where: { id: routeId },
+    });
+
+    revalidatePath("/manager");
+    revalidatePath("/subadmin");
+    revalidatePath("/delivery");
+    return { success: true };
+  } catch (err: any) {
+    console.error("deleteRoute error:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+
 // 13. Cutoff Time check helper
 function checkCutoff(targetDate: Date) {
   const cutoffDate = new Date(targetDate);

@@ -38,16 +38,30 @@ export default async function ManagerDashboardPage() {
     take: 20, // Only show last 20 processed requests
   });
 
-  // 3. Fetch customers list with their wallet balance
+  // 3. Fetch customers list with full details (phone, status, subscriptions, route, delivery person)
   const customers = await prisma.user.findMany({
     where: { role: "CUSTOMER" },
     select: {
       id: true,
       name: true,
       email: true,
+      phone: true,
       address: true,
+      status: true,
       wallet: {
         select: { balance: true },
+      },
+      subscriptions: {
+        select: { status: true },
+        take: 1,
+        orderBy: { createdAt: "desc" },
+      },
+      routeAssignments: {
+        select: {
+          id: true,
+          route: { select: { id: true, name: true } },
+          deliveryPerson: { select: { id: true, name: true } },
+        },
       },
     },
     orderBy: { name: "asc" },
