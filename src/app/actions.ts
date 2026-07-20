@@ -196,7 +196,30 @@ export async function completeDelivery(
 ) {
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // Get the resolved items for today's delivery (taking overrides, pauses, vacations into account)
+      // 1. Security check: Ensure customer is assigned to this delivery person
+      const assignment = await tx.routeAssignment.findFirst({
+        where: { customerId, deliveryPersonId },
+      });
+      if (!assignment) {
+        throw new Error("Unauthorized: Customer is not assigned to your route.");
+      }
+
+      // 2. Duplicate delivery check for today
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const existingDelivery = await tx.delivery.findFirst({
+        where: {
+          customerId,
+          deliveryPersonId,
+          deliveredAt: { gte: todayStart },
+          status: "DELIVERED",
+        },
+      });
+      if (existingDelivery) {
+        throw new Error("Delivery has already been marked complete for this customer today.");
+      }
+
+      // 3. Get the resolved items for today's delivery (taking overrides, pauses, vacations into account)
       const today = new Date();
       const resolvedItems = await getResolvedOrderForDate(customerId, today, tx);
 
@@ -265,7 +288,7 @@ export async function completeDelivery(
         price: item.price,
       }));
 
-      await tx.delivery.create({
+      const deliveryRecord = await tx.delivery.create({
         data: {
           customerId,
           deliveryPersonId,
@@ -276,7 +299,7 @@ export async function completeDelivery(
         },
       });
 
-      return { totalCost, auditLog };
+      return { totalCost, auditLog, deliveryId: deliveryRecord.id };
     });
 
     revalidatePath("/delivery");
@@ -284,6 +307,78 @@ export async function completeDelivery(
     return { success: true, details: result };
   } catch (err: any) {
     console.error("completeDelivery error:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+// 5a. Undo Delivery (Allows delivery person to reverse a recent delivery within 5 minutes)
+export async function undoDelivery(deliveryPersonId: string, deliveryId: string) {
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const delivery = await tx.delivery.findUnique({
+        where: { id: deliveryId },
+      });
+
+      if (!delivery) throw new Error("Delivery record not found.");
+      if (delivery.deliveryPersonId !== deliveryPersonId) {
+        throw new Error("Unauthorized to undo this delivery.");
+      }
+
+      // Check if delivered within last 5 minutes
+      const now = new Date();
+      const diffMs = now.getTime() - delivery.deliveredAt.getTime();
+      if (diffMs > 5 * 60 * 1000) {
+        throw new Error("Undo window has expired (must undo within 5 minutes of delivery).");
+      }
+
+      // Reverse wallet deduction if audit trail exists
+      if (delivery.walletTransactionId) {
+        const auditLog = await tx.walletTransaction.findUnique({
+          where: { id: delivery.walletTransactionId },
+        });
+
+        if (auditLog) {
+          const wallet = await tx.wallet.findUnique({
+            where: { id: auditLog.walletId },
+          });
+
+          if (wallet) {
+            const refundAmount = Math.abs(auditLog.changeAmount);
+            const beforeBalance = wallet.balance;
+            const afterBalance = beforeBalance + refundAmount;
+
+            await tx.wallet.update({
+              where: { id: wallet.id },
+              data: { balance: afterBalance },
+            });
+
+            await tx.walletTransaction.create({
+              data: {
+                walletId: wallet.id,
+                beforeBalance,
+                afterBalance,
+                changeAmount: refundAmount,
+                source: "ADMIN_ADJUSTMENT",
+                description: `Undo / Reversal of delivery #${delivery.id}`,
+              },
+            });
+          }
+        }
+      }
+
+      // Delete delivery record
+      await tx.delivery.delete({
+        where: { id: deliveryId },
+      });
+
+      return { success: true };
+    });
+
+    revalidatePath("/delivery");
+    revalidatePath("/customer");
+    return { success: true, details: result };
+  } catch (err: any) {
+    console.error("undoDelivery error:", err);
     return { success: false, error: err.message };
   }
 }
