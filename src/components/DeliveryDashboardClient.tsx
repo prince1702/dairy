@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { completeDelivery, reportDeliveryIssue, undoDelivery } from "@/app/actions";
+import { completeDelivery, reportDeliveryIssue } from "@/app/actions";
 
 interface SubscriptionItem {
   product: {
@@ -77,14 +77,7 @@ export function DeliveryDashboardClient({
   // Confirmation Modal state
   const [confirmingCustomer, setConfirmingCustomer] = useState<AssignedCustomer | null>(null);
 
-  // Undo Delivery state
-  const [undoInfo, setUndoInfo] = useState<{
-    deliveryId: string;
-    customerId: string;
-    customerName: string;
-    timestamp: number;
-  } | null>(null);
-  const [undoing, setUndoing] = useState(false);
+
 
   // Issue reporting state
   const [reportingCustomerId, setReportingCustomerId] = useState<string | null>(null);
@@ -100,14 +93,7 @@ export function DeliveryDashboardClient({
   // History tab filter state
   const [historyFilter, setHistoryFilter] = useState<"TODAY" | "YESTERDAY" | "LAST_7" | "ALL">("TODAY");
 
-  // Auto-clear undo info after 30 seconds
-  useEffect(() => {
-    if (!undoInfo) return;
-    const timer = setTimeout(() => {
-      setUndoInfo(null);
-    }, 30000);
-    return () => clearTimeout(timer);
-  }, [undoInfo]);
+
 
   // Current Date & Day Name
   const now = new Date();
@@ -146,37 +132,13 @@ export function DeliveryDashboardClient({
         )} & Notification dispatched.`
       );
 
-      if (res.details?.deliveryId) {
-        setUndoInfo({
-          deliveryId: res.details.deliveryId,
-          customerId: customer.id,
-          customerName: customer.name,
-          timestamp: Date.now(),
-        });
-      }
+
     } else {
       setErrorMsg(res.error || "Failed to mark delivery complete.");
     }
   };
 
-  // Undo delivery handler
-  const handleUndoDelivery = async () => {
-    if (!undoInfo) return;
-    setUndoing(true);
-    setErrorMsg("");
-    setSuccessInfo("");
 
-    const res = await undoDelivery(deliveryPersonId, undoInfo.deliveryId);
-    setUndoing(false);
-
-    if (res.success) {
-      setCompletedIds((prev) => prev.filter((id) => id !== undoInfo.customerId));
-      setSuccessInfo(`Delivery for ${undoInfo.customerName} has been undone and wallet refunded.`);
-      setUndoInfo(null);
-    } else {
-      setErrorMsg(res.error || "Failed to undo delivery.");
-    }
-  };
 
   // Issue report handler
   const handleReportSubmit = async (customerId: string, customerName: string) => {
@@ -293,19 +255,7 @@ export function DeliveryDashboardClient({
       {successInfo && <div className="badge badge-success mt-4 block-alert">{successInfo}</div>}
       {errorMsg && <div className="badge badge-danger mt-4 block-alert">{errorMsg}</div>}
 
-      {undoInfo && (
-        <div className="undo-banner card mt-4 flex-between" style={{ background: "#eff6ff", borderColor: "#bfdbfe" }}>
-          <div>
-            <span style={{ fontSize: "14px", fontWeight: 600, color: "#1e40af" }}>
-              ✅ Delivery completed for <strong>{undoInfo.customerName}</strong>
-            </span>
-            <div className="text-muted" style={{ fontSize: "12px" }}>Made a mistake? You can undo this delivery within 30 seconds.</div>
-          </div>
-          <button onClick={handleUndoDelivery} disabled={undoing} className="btn btn-primary" style={{ background: "#2563eb", padding: "6px 14px", fontSize: "12px" }}>
-            {undoing ? "Undoing..." : "↺ Undo Delivery"}
-          </button>
-        </div>
-      )}
+
 
       {/* ─── TAB 1: TODAY'S DELIVERY CHECKLIST ─── */}
       {activeTab === "checklist" && (
