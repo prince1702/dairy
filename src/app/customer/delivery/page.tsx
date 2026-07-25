@@ -24,9 +24,14 @@ export default async function CustomerDeliveryPage() {
     redirect("/login?error=Unauthorized");
   }
 
-  // 2. Fetch delivery records
+  // 2. Fetch delivery records with deliveryPerson details
   const deliveries = await prisma.delivery.findMany({
     where: { customerId },
+    include: {
+      deliveryPerson: {
+        select: { name: true, phone: true },
+      },
+    },
     orderBy: { deliveredAt: "desc" },
   });
 
@@ -40,6 +45,8 @@ export default async function CustomerDeliveryPage() {
         totalCost: del.totalCost,
         status: del.status,
         issueNote: del.issueNote,
+        deliveryPersonName: del.deliveryPerson.name,
+        deliveryPersonPhone: del.deliveryPerson.phone || "",
       }))}
     />
   );

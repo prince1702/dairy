@@ -143,3 +143,35 @@ export async function submitSupportTicket(
     return { success: false, error: err.message || "Failed to submit support ticket." };
   }
 }
+
+// Clear all notifications for a customer
+export async function clearAllNotifications(customerId: string) {
+  try {
+    await prisma.notification.deleteMany({
+      where: { recipientId: customerId },
+    });
+
+    revalidatePath("/customer");
+    return { success: true };
+  } catch (err: any) {
+    console.error("clearAllNotifications error:", err);
+    return { success: false, error: err.message || "Failed to clear notifications." };
+  }
+}
+
+// Mark a single notification as read
+export async function markNotificationReadSingle(customerId: string, notificationId: string) {
+  try {
+    await prisma.notification.update({
+      where: { id: notificationId, recipientId: customerId },
+      data: { isRead: true },
+    });
+
+    revalidatePath("/customer");
+    return { success: true };
+  } catch (err: any) {
+    console.error("markNotificationReadSingle error:", err);
+    return { success: false, error: err.message || "Failed to mark notification as read." };
+  }
+}
+

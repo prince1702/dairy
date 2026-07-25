@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
@@ -15,6 +15,7 @@ interface CustomerLayoutClientProps {
   };
   walletBalance: number;
   unreadNotifications: number;
+  isSubscriptionActive: boolean;
   children: React.ReactNode;
 }
 
@@ -22,6 +23,7 @@ export function CustomerLayoutClient({
   customer,
   walletBalance,
   unreadNotifications,
+  isSubscriptionActive,
   children,
 }: CustomerLayoutClientProps) {
   const pathname = usePathname();
@@ -39,6 +41,11 @@ export function CustomerLayoutClient({
   // Logout confirmation modal state
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
+  // Mock global search state
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   // Load layout configurations from storage
   useEffect(() => {
     const savedCollapse = localStorage.getItem("customer_sidebar_collapsed");
@@ -49,6 +56,18 @@ export function CustomerLayoutClient({
     if (savedTheme === "dark") {
       setIsDarkMode(true);
     }
+  }, []);
+
+  // Keyboard shortcut listener (Cmd+K or Ctrl+K for search focus)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   // Close mobile sidebar on route changes
@@ -72,10 +91,17 @@ export function CustomerLayoutClient({
     signOut({ callbackUrl: "/" });
   };
 
+  // Truncated customer ID helper
+  const getTruncatedId = (id: string) => {
+    if (id.length <= 8) return id;
+    return `#...${id.slice(-6)}`;
+  };
+
   const navigationItems = [
     {
       name: "Dashboard",
       path: "/customer/dashboard",
+      tooltip: "Overview of your account status",
       icon: (
         <svg className="menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -85,6 +111,7 @@ export function CustomerLayoutClient({
     {
       name: "My Subscription",
       path: "/customer/subscription",
+      tooltip: "Manage recurring baseline quantities",
       icon: (
         <svg className="menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -94,6 +121,7 @@ export function CustomerLayoutClient({
     {
       name: "Tomorrow Changes",
       path: "/customer/tomorrow",
+      tooltip: "Single day overrides and cutoff time",
       icon: (
         <svg className="menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -103,6 +131,7 @@ export function CustomerLayoutClient({
     {
       name: "Vacation Mode",
       path: "/customer/vacation",
+      tooltip: "Pause all deliveries for multiple days",
       icon: (
         <svg className="menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
@@ -112,6 +141,7 @@ export function CustomerLayoutClient({
     {
       name: "Daily Pause",
       path: "/customer/pause",
+      tooltip: "Pause tomorrow morning skip",
       icon: (
         <svg className="menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -121,6 +151,7 @@ export function CustomerLayoutClient({
     {
       name: "Wallet",
       path: "/customer/wallet",
+      tooltip: "Transactions timeline and balances",
       icon: (
         <svg className="menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -130,6 +161,7 @@ export function CustomerLayoutClient({
     {
       name: "Recharge Wallet",
       path: "/customer/recharge",
+      tooltip: "Request wallet recharging with receipts",
       icon: (
         <svg className="menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
@@ -139,6 +171,7 @@ export function CustomerLayoutClient({
     {
       name: "Order History",
       path: "/customer/orders",
+      tooltip: "Visual timelines and card order history",
       icon: (
         <svg className="menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -148,6 +181,7 @@ export function CustomerLayoutClient({
     {
       name: "Delivery History",
       path: "/customer/delivery",
+      tooltip: "Detailed delivery person details",
       icon: (
         <svg className="menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -158,6 +192,7 @@ export function CustomerLayoutClient({
     {
       name: "Notifications",
       path: "/customer/notifications",
+      tooltip: "Read and clear your alerts",
       badge: unreadNotifications > 0 ? unreadNotifications : undefined,
       icon: (
         <svg className="menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -168,6 +203,7 @@ export function CustomerLayoutClient({
     {
       name: "My Profile",
       path: "/customer/profile",
+      tooltip: "Edit details and change passwords",
       icon: (
         <svg className="menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -177,6 +213,7 @@ export function CustomerLayoutClient({
     {
       name: "Support",
       path: "/customer/support",
+      tooltip: "FAQ and raise support ticket history",
       icon: (
         <svg className="menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -185,7 +222,7 @@ export function CustomerLayoutClient({
     },
   ];
 
-  // Helper to get Page Title from path
+  // Breadcrumbs/Dynamic Title
   const getPageTitle = () => {
     const matched = navigationItems.find(item => pathname.startsWith(item.path));
     return matched ? matched.name : "Customer Portal";
@@ -195,13 +232,14 @@ export function CustomerLayoutClient({
     <div className={`app-layout-container ${isDarkMode ? "dark-theme" : ""}`}>
       {/* 1. Backdrop for mobile sidebar */}
       {isMobileOpen && (
-        <div className="mobile-sidebar-backdrop" onClick={() => setIsMobileOpen(false)} />
+        <div className="mobile-sidebar-backdrop" onClick={() => setIsMobileOpen(false)} aria-hidden="true" />
       )}
 
-      {/* 2. Left Sidebar */}
-      <aside className={`app-sidebar ${isCollapsed ? "collapsed" : ""} ${isMobileOpen ? "mobile-open" : ""}`}>
+      {/* 2. Collapsible Left Sidebar */}
+      <aside className={`app-sidebar ${isCollapsed ? "collapsed" : ""} ${isMobileOpen ? "mobile-open" : ""}`} aria-label="Sidebar Navigation">
+        {/* Brand Area */}
         <div className="sidebar-brand">
-          <Link href="/customer/dashboard" className="sidebar-logo">
+          <Link href="/customer/dashboard" className="sidebar-logo" aria-label="Bhagwati Enterprise Dashboard Home">
             <span className="logo-icon">🥛</span>
             {!isCollapsed && (
               <span className="logo-text">
@@ -209,18 +247,52 @@ export function CustomerLayoutClient({
               </span>
             )}
           </Link>
-          <button className="collapse-btn desktop-only" onClick={toggleCollapse} title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}>
+          <button
+            className="collapse-btn desktop-only"
+            onClick={toggleCollapse}
+            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
             {isCollapsed ? "→" : "←"}
           </button>
         </div>
 
-        {/* Quick Wallet Summary in Sidebar */}
+        {/* Extended User Metadata in Sidebar */}
+        <div className="sidebar-user-details-card">
+          <div className="sidebar-user-avatar-row">
+            <div className="avatar-circle-sm">
+              {customer.name ? customer.name.charAt(0).toUpperCase() : "U"}
+            </div>
+            {!isCollapsed && (
+              <div className="avatar-meta">
+                <span className="user-title-name">{customer.name}</span>
+                <span className="user-id-badge">{getTruncatedId(customer.id)}</span>
+              </div>
+            )}
+          </div>
+
+          {!isCollapsed && (
+            <div className="sidebar-status-meta">
+              <div className="status-meta-row">
+                <span className="meta-dot pulse-green"></span>
+                <span className="meta-text">Online</span>
+              </div>
+              <div className="status-meta-row">
+                <span className={`status-badge-inline ${isSubscriptionActive ? "active" : "inactive"}`}>
+                  {isSubscriptionActive ? "Active Schedule" : "No Active Sub"}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Quick Wallet Summary Card */}
         <div className="sidebar-wallet-card">
-          <span className="wallet-card-label">Wallet Balance</span>
+          <span className="wallet-card-label">Balance</span>
           <span className="wallet-card-amount">₹{walletBalance.toFixed(2)}</span>
         </div>
 
-        {/* Navigation Items */}
+        {/* Navigation List */}
         <nav className="sidebar-nav">
           {navigationItems.map((item) => {
             const isActive = pathname === item.path;
@@ -229,7 +301,8 @@ export function CustomerLayoutClient({
                 key={item.path}
                 href={item.path}
                 className={`nav-item ${isActive ? "active" : ""}`}
-                title={item.name}
+                title={isCollapsed ? item.tooltip : ""}
+                aria-label={item.name}
               >
                 {item.icon}
                 <span className="nav-label">{item.name}</span>
@@ -243,7 +316,8 @@ export function CustomerLayoutClient({
           <button
             onClick={() => setShowLogoutModal(true)}
             className="nav-item logout-nav-btn"
-            title="Logout"
+            title={isCollapsed ? "Logout of system" : ""}
+            aria-label="Logout"
           >
             <svg className="menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -255,20 +329,50 @@ export function CustomerLayoutClient({
 
       {/* 3. Main Dashboard Wrapper */}
       <div className="app-main-wrapper">
-        {/* Top Header */}
+        {/* Sticky Top Navbar */}
         <header className="app-header">
           <div className="header-left">
-            <button className="mobile-hamburger-btn" onClick={() => setIsMobileOpen(!isMobileOpen)}>
+            <button
+              className="mobile-hamburger-btn"
+              onClick={() => setIsMobileOpen(!isMobileOpen)}
+              aria-label="Toggle mobile drawer"
+            >
               <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" width="24" height="24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <h2 className="header-title">{getPageTitle()}</h2>
+            <div className="breadcrumbs">
+              <span className="breadcrumb-parent text-muted">Customer</span>
+              <span className="breadcrumb-separator">/</span>
+              <span className="breadcrumb-current">{getPageTitle()}</span>
+            </div>
           </div>
 
+          {/* Search bar & right actions */}
           <div className="header-right">
+            {/* Search Input bar */}
+            <div className="header-search-bar desktop-only">
+              <svg className="search-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Type Ctrl+K to search..."
+                className="header-search-input"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Search inputs"
+              />
+            </div>
+
             {/* Theme Toggle Button */}
-            <button className="theme-toggle-btn" onClick={toggleTheme} title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}>
+            <button
+              className="theme-toggle-btn"
+              onClick={toggleTheme}
+              aria-label={isDarkMode ? "Switch to Light Theme" : "Switch to Dark Theme"}
+              title={isDarkMode ? "Switch to Light Theme" : "Switch to Dark Theme"}
+            >
               {isDarkMode ? (
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" width="20" height="20">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
@@ -281,15 +385,20 @@ export function CustomerLayoutClient({
             </button>
 
             {/* Notifications Shortcut */}
-            <Link href="/customer/notifications" className="header-notifications-btn" title="View Notifications">
+            <Link
+              href="/customer/notifications"
+              className="header-notifications-btn"
+              title="View your notifications log"
+              aria-label={`${unreadNotifications} unread notifications`}
+            >
               <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" width="20" height="20">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
               {unreadNotifications > 0 && <span className="header-badge">{unreadNotifications}</span>}
             </Link>
 
-            {/* Profile Dropdown Trigger */}
-            <Link href="/customer/profile" className="header-profile-link">
+            {/* Profile link */}
+            <Link href="/customer/profile" className="header-profile-link" aria-label="Go to My Profile page">
               <div className="profile-avatar">
                 {customer.name ? customer.name.charAt(0).toUpperCase() : "U"}
               </div>
@@ -298,7 +407,7 @@ export function CustomerLayoutClient({
           </div>
         </header>
 
-        {/* Main Content Area */}
+        {/* Page Content Body */}
         <main className="app-content-body">
           {children}
         </main>
@@ -306,9 +415,9 @@ export function CustomerLayoutClient({
 
       {/* 4. Logout Modal */}
       {showLogoutModal && (
-        <div className="modal-overlay">
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="logout-dialog-title">
           <div className="modal-card">
-            <h3>Confirm Logout</h3>
+            <h3 id="logout-dialog-title">Confirm Logout</h3>
             <p>Are you sure you want to log out of Bhagwati Enterprise?</p>
             <div className="modal-actions">
               <button className="btn btn-outline" onClick={() => setShowLogoutModal(false)}>
@@ -322,8 +431,14 @@ export function CustomerLayoutClient({
         </div>
       )}
 
-      {/* Styled JSX Stylesheets */}
+      {/* Global & Theme Styles */}
       <style jsx global>{`
+        /* Focus state accessibility */
+        *:focus-visible {
+          outline: 2px solid var(--primary-color) !important;
+          outline-offset: 2px;
+        }
+
         /* Dynamic Themed Properties */
         .app-layout-container {
           --bg-app: #FAFAF7;
@@ -438,16 +553,136 @@ export function CustomerLayoutClient({
           color: var(--primary-color);
         }
 
+        /* Sidebar details card */
+        .sidebar-user-details-card {
+          margin: 16px;
+          padding: 12px;
+          background: var(--border-light);
+          border-radius: 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .collapsed .sidebar-user-details-card {
+          padding: 6px;
+          margin: 8px;
+          align-items: center;
+        }
+
+        .sidebar-user-avatar-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .avatar-circle-sm {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          background: var(--primary-color);
+          color: white;
+          font-weight: bold;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 13px;
+        }
+
+        .avatar-meta {
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+
+        .user-title-name {
+          font-size: 13px;
+          font-weight: 600;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          color: var(--text-main);
+        }
+
+        .user-id-badge {
+          font-size: 10px;
+          color: var(--text-muted);
+        }
+
+        .sidebar-status-meta {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-top: 1px solid var(--border-color);
+          padding-top: 8px;
+        }
+
+        .status-meta-row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .meta-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+        }
+
+        .pulse-green {
+          background: #10B981;
+          box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+          animation: pulse 1.6s infinite;
+        }
+
+        @keyframes pulse {
+          0% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+          }
+          70% {
+            transform: scale(1);
+            box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+          }
+          100% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+          }
+        }
+
+        .meta-text {
+          font-size: 11px;
+          color: var(--text-muted);
+          font-weight: 500;
+        }
+
+        .status-badge-inline {
+          font-size: 9px;
+          font-weight: bold;
+          padding: 2px 6px;
+          border-radius: 4px;
+        }
+
+        .status-badge-inline.active {
+          background: var(--primary-light);
+          color: var(--primary-color);
+        }
+
+        .status-badge-inline.inactive {
+          background: var(--border-color);
+          color: var(--text-muted);
+        }
+
         /* Sidebar Wallet Card */
         .sidebar-wallet-card {
-          margin: 16px;
-          padding: 16px;
+          margin: 0 16px 16px 16px;
+          padding: 12px 16px;
           background: linear-gradient(135deg, var(--primary-color) 0%, rgba(16, 185, 129, 0.8) 100%);
           border-radius: 12px;
           color: white;
           display: flex;
           flex-direction: column;
-          gap: 4px;
+          gap: 2px;
           box-shadow: 0 4px 12px var(--shadow-color);
           overflow: hidden;
           transition: opacity 0.2s, max-height 0.2s, padding 0.2s;
@@ -462,14 +697,14 @@ export function CustomerLayoutClient({
         }
 
         .wallet-card-label {
-          font-size: 11px;
+          font-size: 10px;
           text-transform: uppercase;
           letter-spacing: 0.05em;
           opacity: 0.9;
         }
 
         .wallet-card-amount {
-          font-size: 22px;
+          font-size: 18px;
           font-weight: 700;
         }
 
@@ -499,6 +734,7 @@ export function CustomerLayoutClient({
           width: 100%;
           text-align: left;
           transition: all 0.2s ease;
+          position: relative;
         }
 
         .nav-item:hover {
@@ -579,7 +815,6 @@ export function CustomerLayoutClient({
         /* Header Styling */
         .app-header {
           height: 70px;
-          background: var(--bg-sidebar);
           border-bottom: 1px solid var(--border-color);
           padding: 0 32px;
           display: flex;
@@ -588,8 +823,14 @@ export function CustomerLayoutClient({
           position: sticky;
           top: 0;
           z-index: 90;
-          backdrop-filter: blur(8px);
-          background: rgba(var(--bg-sidebar), 0.8);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          background: rgba(250, 250, 247, 0.85);
+          transition: background-color 0.3s ease;
+        }
+
+        .dark-theme .app-header {
+          background: rgba(11, 15, 25, 0.85);
         }
 
         .header-left {
@@ -606,8 +847,17 @@ export function CustomerLayoutClient({
           cursor: pointer;
         }
 
-        .header-title {
-          font-size: 18px;
+        /* Breadcrumbs title style */
+        .breadcrumbs {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 14px;
+          font-weight: 500;
+        }
+
+        .breadcrumb-current {
+          font-size: 16px;
           font-weight: 600;
           color: var(--text-main);
         }
@@ -616,6 +866,33 @@ export function CustomerLayoutClient({
           display: flex;
           align-items: center;
           gap: 16px;
+        }
+
+        /* Search input bar styling */
+        .header-search-bar {
+          display: flex;
+          align-items: center;
+          background: var(--border-light);
+          border: 1px solid var(--border-color);
+          border-radius: 8px;
+          padding: 6px 12px;
+          gap: 8px;
+          width: 220px;
+        }
+
+        .search-icon {
+          width: 16px;
+          height: 16px;
+          color: var(--text-muted);
+        }
+
+        .header-search-input {
+          background: transparent;
+          border: none;
+          outline: none;
+          font-size: 13px;
+          color: var(--text-main);
+          width: 100%;
         }
 
         .theme-toggle-btn, .header-notifications-btn {
@@ -746,7 +1023,7 @@ export function CustomerLayoutClient({
           to { transform: scale(1); opacity: 1; }
         }
 
-        /* Screen Size Adaptations */
+        /* Responsive Layouts */
         .desktop-only {
           display: flex;
         }
@@ -757,6 +1034,7 @@ export function CustomerLayoutClient({
             width: 78px;
           }
           .app-sidebar .nav-label, 
+          .app-sidebar .sidebar-user-details-card,
           .app-sidebar .sidebar-wallet-card, 
           .app-sidebar .collapse-btn {
             display: none !important;
@@ -783,6 +1061,9 @@ export function CustomerLayoutClient({
           }
           .app-sidebar .nav-label {
             display: block !important;
+          }
+          .app-sidebar .sidebar-user-details-card {
+            display: flex !important;
           }
           .app-sidebar .sidebar-wallet-card {
             display: flex !important;

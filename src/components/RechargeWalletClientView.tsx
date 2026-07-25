@@ -28,7 +28,7 @@ export function RechargeWalletClientView({
 }: RechargeWalletClientViewProps) {
   const router = useRouter();
 
-  // Recharge State
+  // Recharge state
   const [rechargeAmount, setRechargeAmount] = useState("");
   const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -36,16 +36,52 @@ export function RechargeWalletClientView({
   const [rechargeSuccess, setRechargeSuccess] = useState(false);
   const [rechargeError, setRechargeError] = useState("");
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    setScreenshotFile(file);
+  // Drag and Drop active indicator
+  const [isDragActive, setIsDragActive] = useState(false);
 
+  // Floating label active states
+  const [isAmountFocused, setIsAmountFocused] = useState(false);
+
+  const amountPresets = [200, 500, 1000, 2000];
+
+  const handleFileChange = (file: File | null) => {
+    setScreenshotFile(file);
     if (file) {
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
     } else {
       setPreviewUrl(null);
     }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    handleFileChange(file);
+  };
+
+  // Drag and Drop handlers
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setIsDragActive(true);
+    } else if (e.type === "dragleave") {
+      setIsDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileChange(e.dataTransfer.files[0]);
+    }
+  };
+
+  const selectPresetAmount = (val: number) => {
+    setRechargeAmount(String(val));
   };
 
   const handleRechargeSubmit = async (e: React.FormEvent) => {
@@ -92,63 +128,107 @@ export function RechargeWalletClientView({
   return (
     <div className="recharge-container">
       <div className="recharge-grid">
-        {/* Left Side: Submit Request form */}
+        {/* Left Side: Submit Request */}
         <div className="recharge-form-card card">
           <h3>Request Balance Recharge</h3>
-          <p className="text-muted">Enter the transfer amount and upload the screenshot of your payment receipt (GPay, PhonePe, Paytm, or NetBanking).</p>
+          <p className="text-muted">Transfer your recharge amount via UPI or NetBanking, then upload the receipt below.</p>
 
-          {rechargeError && <div className="badge badge-danger mb-4 block-alert">{rechargeError}</div>}
-          {rechargeSuccess && <div className="badge badge-success mb-4 block-alert">Recharge request submitted successfully! Pending admin approval.</div>}
+          {rechargeError && <div className="badge badge-danger mb-4 block-alert animation-shake">{rechargeError}</div>}
+          {rechargeSuccess && <div className="badge badge-success mb-4 block-alert animation-bounce">Recharge request submitted! Pending approval.</div>}
 
-          <form onSubmit={handleRechargeSubmit} className="mt-4">
-            <div className="form-group">
-              <label className="form-label" htmlFor="amount">Recharge Amount (₹)</label>
+          <form onSubmit={handleRechargeSubmit} className="mt-6">
+            {/* Amount input with Floating label */}
+            <div className={`floating-form-group ${isAmountFocused || rechargeAmount ? "focused" : ""}`}>
+              <label className="floating-label" htmlFor="amount">Recharge Amount (₹)</label>
               <input
                 id="amount"
                 type="number"
-                className="form-input"
-                placeholder="e.g. 500"
+                className="form-input floating-input"
+                placeholder=""
                 value={rechargeAmount}
                 onChange={(e) => setRechargeAmount(e.target.value)}
+                onFocus={() => setIsAmountFocused(true)}
+                onBlur={() => setIsAmountFocused(false)}
                 disabled={rechargeSubmitting}
                 required
               />
             </div>
 
-            <div className="form-group">
-              <label className="form-label" htmlFor="receipt-file">Upload Payment Screenshot</label>
-              <input
-                id="receipt-file"
-                type="file"
-                accept="image/*"
-                className="form-input"
-                onChange={handleFileChange}
-                disabled={rechargeSubmitting}
-                required
-              />
-              <span className="file-hint text-muted">Please provide a valid transaction receipt screenshot.</span>
+            {/* Quick Amount presets */}
+            <div className="presets-row mt-2">
+              {amountPresets.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  className={`preset-btn ${Number(rechargeAmount) === preset ? "selected" : ""}`}
+                  onClick={() => selectPresetAmount(preset)}
+                  disabled={rechargeSubmitting}
+                >
+                  +₹{preset}
+                </button>
+              ))}
+            </div>
+
+            {/* Drag & Drop File Zone */}
+            <div className="form-group mt-6">
+              <label className="form-label-title">Upload Payment Screenshot</label>
+              
+              <div
+                className={`drag-drop-zone ${isDragActive ? "drag-active" : ""} ${screenshotFile ? "has-file" : ""}`}
+                onDragEnter={handleDrag}
+                onDragOver={handleDrag}
+                onDragLeave={handleDrag}
+                onDrop={handleDrop}
+                onClick={() => document.getElementById("receipt-file")?.click()}
+              >
+                <input
+                  id="receipt-file"
+                  type="file"
+                  accept="image/*"
+                  className="hidden-file-input"
+                  onChange={handleFileInputChange}
+                  disabled={rechargeSubmitting}
+                />
+                
+                <span className="zone-icon">{screenshotFile ? "📸" : "📤"}</span>
+                <span className="zone-text">
+                  {screenshotFile ? (
+                    <strong>{screenshotFile.name}</strong>
+                  ) : (
+                    "Drag and drop payment receipt here, or click to browse files"
+                  )}
+                </span>
+                <span className="zone-subtext text-muted">Supports JPG, PNG, WEBP (Max 5MB)</span>
+              </div>
             </div>
 
             {/* Local Image Preview */}
             {previewUrl && (
-              <div className="screenshot-preview-box">
+              <div className="screenshot-preview-card mt-4">
                 <span className="preview-label">Receipt Image Preview</span>
-                <div className="preview-img-container">
-                  <img src={previewUrl} alt="Payment Receipt Preview" />
+                <div className="preview-image-cropper">
+                  <img src={previewUrl} alt="Payment Receipt Screenshot" />
                 </div>
               </div>
             )}
 
-            <button type="submit" className="btn btn-primary w-full mt-4" disabled={rechargeSubmitting}>
-              {rechargeSubmitting ? "Submitting screenshot..." : "Submit Receipt Screenshot"}
+            <button type="submit" className="btn btn-primary w-full mt-6 btn-loader-parent" disabled={rechargeSubmitting}>
+              {rechargeSubmitting ? (
+                <>
+                  <span className="button-spinner"></span>
+                  Submitting Screenshot...
+                </>
+              ) : (
+                "Submit Receipt Screenshot"
+              )}
             </button>
           </form>
         </div>
 
         {/* Right Side: Requests history */}
         <div className="recharge-history-card card">
-          <h3>Recharge History</h3>
-          <p className="text-muted">Review approvals or rejections of your recent top-up requests.</p>
+          <h3>Recharge History Log</h3>
+          <p className="text-muted">Audit log of your submitted balance top-up requests.</p>
 
           <div className="history-table-wrapper mt-4">
             {paymentRequests.length === 0 ? (
@@ -159,7 +239,7 @@ export function RechargeWalletClientView({
                   <tr>
                     <th>Date</th>
                     <th>Amount</th>
-                    <th>Receipt</th>
+                    <th>Receipt screenshot</th>
                     <th>Status</th>
                   </tr>
                 </thead>
@@ -196,20 +276,124 @@ export function RechargeWalletClientView({
 
         .recharge-grid {
           display: grid;
-          grid-template-columns: 1fr 1.2fr;
+          grid-template-columns: 1fr 1.3fr;
           gap: 32px;
           align-items: flex-start;
         }
 
-        .file-hint {
-          display: block;
-          font-size: 11px;
-          margin-top: 4px;
+        /* Floating label styling */
+        .floating-form-group {
+          position: relative;
         }
 
-        /* Screenshot Preview styling */
-        .screenshot-preview-box {
-          margin-top: 16px;
+        .floating-label {
+          position: absolute;
+          left: 16px;
+          top: 14px;
+          font-size: 14px;
+          color: var(--text-muted);
+          pointer-events: none;
+          transition: transform 0.2s, font-size 0.2s, color 0.2s;
+        }
+
+        .floating-input {
+          padding-top: 20px;
+          padding-bottom: 6px;
+        }
+
+        .floating-form-group.focused .floating-label,
+        .floating-form-group .floating-input:not([value=""]) + .floating-label {
+          transform: translateY(-8px) scale(0.85);
+          transform-origin: top left;
+          color: var(--primary-color);
+        }
+
+        /* Presets Amount styling */
+        .presets-row {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+
+        .preset-btn {
+          padding: 6px 12px;
+          border-radius: 20px;
+          border: 1px solid var(--border-color);
+          background: var(--bg-card);
+          color: var(--text-main);
+          font-size: 11px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .preset-btn:hover {
+          border-color: var(--primary-color);
+          background: var(--primary-light);
+          color: var(--primary-color);
+        }
+
+        .preset-btn.selected {
+          background: var(--primary-color);
+          color: white;
+          border-color: var(--primary-color);
+        }
+
+        /* Drag drop zone */
+        .form-label-title {
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--text-main);
+          margin-bottom: 6px;
+          display: block;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+
+        .drag-drop-zone {
+          border: 2px dashed var(--border-color);
+          border-radius: 12px;
+          padding: 24px 16px;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          cursor: pointer;
+          background: var(--border-light);
+          transition: all 0.2s ease;
+        }
+
+        .drag-drop-zone:hover, .drag-drop-zone.drag-active {
+          border-color: var(--primary-color);
+          background: var(--primary-light);
+        }
+
+        .drag-drop-zone.has-file {
+          border-style: solid;
+          border-color: var(--primary-color);
+        }
+
+        .hidden-file-input {
+          display: none;
+        }
+
+        .zone-icon {
+          font-size: 28px;
+        }
+
+        .zone-text {
+          font-size: 13px;
+          color: var(--text-main);
+        }
+
+        .zone-subtext {
+          font-size: 11px;
+        }
+
+        /* Screenshot Preview Card */
+        .screenshot-preview-card {
           background: var(--border-light);
           padding: 12px;
           border-radius: 8px;
@@ -226,8 +410,8 @@ export function RechargeWalletClientView({
           margin-bottom: 8px;
         }
 
-        .preview-img-container {
-          max-height: 250px;
+        .preview-image-cropper {
+          max-height: 200px;
           overflow: hidden;
           border-radius: 6px;
           display: flex;
@@ -235,10 +419,31 @@ export function RechargeWalletClientView({
           background: #000;
         }
 
-        .preview-img-container img {
+        .preview-image-cropper img {
           max-width: 100%;
-          max-height: 250px;
+          max-height: 200px;
           object-fit: contain;
+        }
+
+        /* Loader Button styling */
+        .btn-loader-parent {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+        }
+
+        .button-spinner {
+          width: 16px;
+          height: 16px;
+          border: 2px solid white;
+          border-top-color: transparent;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
         }
 
         /* History table styling */
@@ -310,14 +515,24 @@ export function RechargeWalletClientView({
           font-style: italic;
         }
 
-        .block-alert {
-          display: block;
-          text-align: center;
-          padding: 10px;
+        /* Animations */
+        .animation-shake {
+          animation: shake 0.4s ease;
         }
 
-        .w-full {
-          width: 100%;
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-4px); }
+          75% { transform: translateX(4px); }
+        }
+
+        .animation-bounce {
+          animation: bounce 0.4s ease;
+        }
+
+        @keyframes bounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-4px); }
         }
 
         @media (max-width: 900px) {

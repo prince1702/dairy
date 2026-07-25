@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { upsertOrderOverride, toggleTomorrowPause } from "@/app/actions";
 import { useRouter } from "next/navigation";
 
@@ -36,7 +36,7 @@ export function TomorrowChangesClientView({
 }: TomorrowChangesClientViewProps) {
   const router = useRouter();
 
-  // Tomorrow's Override State
+  // Tomorrow's state
   const [tomorrowPause, setTomorrowPause] = useState(isTomorrowPaused);
   const [overrideQuantities, setOverrideQuantities] = useState<Record<string, number>>(() => {
     const quantities: Record<string, number> = {};
@@ -57,7 +57,44 @@ export function TomorrowChangesClientView({
   const [overrideError, setOverrideError] = useState("");
   const [pauseSubmitting, setPauseSubmitting] = useState(false);
 
-  // Cutoff time helper (10:00 PM local time today)
+  // Confirmation modal state
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  // Cutoff time progress states (10:00 PM today)
+  const [timeUntilCutoff, setTimeUntilCutoff] = useState("");
+  const [cutoffProgress, setCutoffProgress] = useState(100);
+
+  useEffect(() => {
+    const calculateCutoff = () => {
+      const now = new Date();
+      const cutoff = new Date();
+      cutoff.setHours(22, 0, 0, 0); // 10 PM
+      
+      const diff = cutoff.getTime() - now.getTime();
+
+      if (diff <= 0) {
+        setTimeUntilCutoff("Passed (Locked)");
+        setCutoffProgress(0);
+      } else {
+        // Calculate progress percentage from 8 AM to 10 PM (14 hours total)
+        const startDay = new Date();
+        startDay.setHours(8, 0, 0, 0);
+        const totalDuration = cutoff.getTime() - startDay.getTime();
+        const currentElapsed = now.getTime() - startDay.getTime();
+        const progress = Math.max(0, Math.min(100, 100 - (currentElapsed / totalDuration) * 100));
+
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        setTimeUntilCutoff(`${hours}h ${minutes}m remaining`);
+        setCutoffProgress(progress);
+      }
+    };
+
+    calculateCutoff();
+    const interval = setInterval(calculateCutoff, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   const isCutoffPassed = () => {
     const now = new Date();
     const cutoff = new Date();
@@ -85,17 +122,20 @@ export function TomorrowChangesClientView({
     }));
   };
 
-  const handleOverrideSubmit = async (e: React.FormEvent) => {
+  const triggerSaveConfirm = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isCutoffPassed()) {
+      setOverrideError("Cutoff time (10:00 PM) has passed. Changes cannot be saved.");
+      return;
+    }
+    setShowConfirmModal(true);
+  };
+
+  const executeSaveOverrides = async () => {
+    setShowConfirmModal(false);
     setOverrideSubmitting(true);
     setOverrideSuccess(false);
     setOverrideError("");
-
-    if (isCutoffPassed()) {
-      setOverrideError("Cutoff time (10:00 PM) has passed. Tomorrow's order cannot be modified.");
-      setOverrideSubmitting(false);
-      return;
-    }
 
     try {
       const tomorrow = new Date();
@@ -110,7 +150,6 @@ export function TomorrowChangesClientView({
         const recurringQty = recurring ? recurring.quantity : 0;
         const currentQty = overrideQuantities[p.id];
 
-        // Save override if it differs from the recurring subscription quantity
         if (currentQty !== recurringQty) {
           const res = await upsertOrderOverride(customer.id, p.id, currentQty, tomorrowStr);
           if (!res.success) {
@@ -140,7 +179,7 @@ export function TomorrowChangesClientView({
     setOverrideSuccess(false);
 
     if (isCutoffPassed()) {
-      setOverrideError("Cutoff time (10:00 PM) has passed. Tomorrow's pause status cannot be modified.");
+      setOverrideError("Cutoff time (10:00 PM) has passed. Tomorrow's pause settings cannot be changed.");
       setPauseSubmitting(false);
       return;
     }
@@ -168,56 +207,60 @@ export function TomorrowChangesClientView({
     }
   };
 
-  // Get what items will be delivered tomorrow
-  const getTomorrowActiveItems = () => {
-    if (tomorrowPause) return [];
-    if (isTomorrowOnVacation()) return [];
+  // Compile comparison data
+  const comparisonItems = products
+    .map((p) => {
+      const baselineQty = subscriptionItems.find((s) => s.productId === p.id)?.quantity || 0;
+      const overrideQty = overrideQuantities[p.id] || 0;
+      const difference = overrideQty - baselineQty;
+      const priceDiff = difference * p.price;
 
-    return products
-      .map((p) => {
-        const qty = overrideQuantities[p.id];
-        const baseline = subscriptionItems.find((s) => s.productId === p.id)?.quantity || 0;
-        const isModified = qty !== baseline;
-        return {
-          ...p,
-          qty,
-          isModified,
-        };
-      })
-      .filter((p) => p.qty > 0);
-  };
+      return {
+        ...p,
+        baselineQty,
+        overrideQty,
+        difference,
+        priceDiff,
+      };
+    })
+    .filter((p) => p.baselineQty > 0 || p.overrideQty > 0);
 
-  const tomorrowActiveItems = getTomorrowActiveItems();
-  const tomorrowTotalCost = tomorrowActiveItems.reduce((sum, p) => sum + p.price * p.qty, 0);
+  const tomorrowActiveItems = comparisonItems.filter((p) => p.overrideQty > 0);
+  const tomorrowTotalCost = tomorrowActiveItems.reduce((sum, p) => sum + p.price * p.overrideQty, 0);
 
   return (
-    <div className="tomorrow-container">
+    <div className="tomorrow-wrapper">
       <div className="tomorrow-grid">
-        {/* Left Form Panel */}
-        <div className="tomorrow-form-panel card">
+        {/* Left Side: Overrides Selector */}
+        <div className="tomorrow-control-panel card">
           <div className="tomorrow-header">
             <h3>One-Day Quantities Override</h3>
-            <p className="text-muted">Modify quantities for tomorrow's delivery only. Baseline subscription remains unchanged.</p>
+            <p className="text-muted">Modify quantities for tomorrow's order. Does not overwrite your daily baseline schedule.</p>
           </div>
 
-          {/* Cutoff Time Warning Banner */}
-          <div className={`cutoff-banner ${isCutoffPassed() ? "passed" : "active"}`}>
-            <span className="banner-icon">{isCutoffPassed() ? "🔒" : "🔓"}</span>
-            <div>
-              <strong>Daily Cutoff Time: 10:00 PM</strong>
-              <p>{isCutoffPassed() ? "Tomorrow's delivery is locked." : "Tomorrow's order changes can be modified until 10:00 PM today."}</p>
+          {/* Cutoff progress visualizer bar */}
+          <div className={`cutoff-progress-banner ${isCutoffPassed() ? "locked" : ""}`}>
+            <div className="cutoff-banner-text">
+              <span>{isCutoffPassed() ? "🔒 Locked (After 10:00 PM)" : "🔓 Changes open"}</span>
+              <strong>{timeUntilCutoff}</strong>
             </div>
+            {!isCutoffPassed() && (
+              <div className="progress-bar-bg">
+                <div className="progress-bar-fill" style={{ width: `${cutoffProgress}%` }}></div>
+              </div>
+            )}
+            <span className="cutoff-sub-desc">Cutoff time: 10:00 PM daily. Next delivery starts around 5:00 AM.</span>
           </div>
 
           {overrideError && <div className="badge badge-danger mb-4 block-alert">{overrideError}</div>}
-          {overrideSuccess && <div className="badge badge-success mb-4 block-alert">Tomorrow's order overrides saved!</div>}
+          {overrideSuccess && <div className="badge badge-success mb-4 block-alert">Tomorrow's order settings saved!</div>}
 
-          {/* Pause Toggle Bar */}
+          {/* Daily Pause Bar */}
           <div className="pause-override-bar">
             <div>
               <strong>Pause Tomorrow's Order</strong>
               <p className="text-muted" style={{ fontSize: "12px", marginTop: "2px" }}>
-                Skip delivery tomorrow without charge.
+                Skip delivery tomorrow without wallet charge.
               </p>
             </div>
             <button
@@ -231,48 +274,46 @@ export function TomorrowChangesClientView({
           </div>
 
           {!tomorrowPause && (
-            <form onSubmit={handleOverrideSubmit}>
-              <div className="overrides-products-list">
+            <form onSubmit={triggerSaveConfirm}>
+              <div className="products-override-list">
                 {products.map((p) => {
-                  const recurring = subscriptionItems.find((item) => item.productId === p.id);
-                  const recurringQty = recurring ? recurring.quantity : 0;
-                  const currentQty = overrideQuantities[p.id];
-                  const isModified = currentQty !== recurringQty;
+                  const baselineQty = subscriptionItems.find((item) => item.productId === p.id)?.quantity || 0;
+                  const currentQty = overrideQuantities[p.id] || 0;
+                  const isModified = currentQty !== baselineQty;
 
                   return (
-                    <div key={p.id} className="override-product-row">
-                      <div className="product-details">
-                        <span className="product-emoji">{p.emoji}</span>
+                    <div key={p.id} className="override-row">
+                      <div className="override-p-info">
+                        <span className="override-p-emoji">{p.emoji}</span>
                         <div>
                           <strong>{p.name}</strong>
-                          <div className="product-price text-muted">
+                          <div className="override-p-meta text-muted">
                             {p.size} • ₹{p.price.toFixed(2)}
-                            {recurringQty > 0 && (
-                              <span className="baseline-indicator">
-                                Baseline: {recurringQty}
+                            {baselineQty > 0 && (
+                              <span className="badge-baseline">
+                                Baseline: {baselineQty}
                               </span>
                             )}
                           </div>
                         </div>
                       </div>
 
-                      <div className="override-controls">
+                      <div className="override-actions">
                         {isModified && (
                           <button
                             type="button"
-                            className="btn-reset-override"
-                            onClick={() => handleOverrideQtyChange(p.id, recurringQty)}
-                            title="Reset to baseline"
+                            className="btn-reset"
+                            onClick={() => handleOverrideQtyChange(p.id, baselineQty)}
                           >
                             Reset
                           </button>
                         )}
-                        <div className="quantity-selector">
+                        <div className="qty-selector">
                           <button
                             type="button"
                             className="qty-btn"
                             onClick={() => handleOverrideQtyChange(p.id, currentQty - 1)}
-                            disabled={overrideSubmitting || isCutoffPassed()}
+                            disabled={isCutoffPassed()}
                           >
                             -
                           </button>
@@ -281,7 +322,7 @@ export function TomorrowChangesClientView({
                             type="button"
                             className="qty-btn"
                             onClick={() => handleOverrideQtyChange(p.id, currentQty + 1)}
-                            disabled={overrideSubmitting || isCutoffPassed()}
+                            disabled={isCutoffPassed()}
                           >
                             +
                           </button>
@@ -297,64 +338,77 @@ export function TomorrowChangesClientView({
                 className="btn btn-primary w-full mt-6"
                 disabled={overrideSubmitting || isCutoffPassed()}
               >
-                {overrideSubmitting ? "Saving Overrides..." : "Save Tomorrow's Delivery Only"}
+                Save Tomorrow's Delivery Only
               </button>
             </form>
           )}
 
           {tomorrowPause && (
-            <div className="tomorrow-paused-screen">
+            <div className="paused-container">
               <span className="paused-icon">⏸️</span>
-              <h4>Tomorrow's Delivery is Paused</h4>
-              <p className="text-muted">Click "Resume" above to reactivate deliveries and configure overrides.</p>
+              <h4>Tomorrow's delivery is paused</h4>
+              <p className="text-muted">You will not receive any items tomorrow. Reactivate by clicking "Resume" above.</p>
             </div>
           )}
         </div>
 
-        {/* Right Preview Panel */}
+        {/* Right Side: Order Preview & Comparison Table */}
         <div className="tomorrow-preview-panel card">
           <h3>Tomorrow's Delivery Preview</h3>
-          <p className="text-muted">Live checkout summary for tomorrow morning's delivery.</p>
+          <p className="text-muted">Review baseline vs tomorrow's override quantities and total checkout differences.</p>
 
-          <div className="tomorrow-preview-box">
+          <div className="preview-receipt-wrapper mt-4">
             {isTomorrowOnVacation() ? (
-              <div className="vacation-preview">
-                <span className="vacation-icon">✈️</span>
+              <div className="status-screen vacation">
+                <span className="screen-icon">✈️</span>
                 <h4>Vacation Mode Active</h4>
-                <p className="text-muted">All deliveries paused via vacation scheduler.</p>
+                <p className="text-muted">All deliveries paused via vacation planner.</p>
               </div>
             ) : tomorrowPause ? (
-              <div className="paused-preview">
-                <span className="pause-icon">⏸️</span>
+              <div className="status-screen paused">
+                <span className="screen-icon">⏸️</span>
                 <h4>Delivery Paused</h4>
-                <p className="text-muted">No items will be delivered tomorrow.</p>
+                <p className="text-muted">Tomorrow's order is paused. No deductions will occur.</p>
               </div>
-            ) : tomorrowActiveItems.length === 0 ? (
-              <div className="empty-preview">
-                <span className="empty-icon">🛒</span>
+            ) : comparisonItems.length === 0 ? (
+              <div className="status-screen empty">
+                <span className="screen-icon">🛒</span>
                 <h4>No Items Scheduled</h4>
-                <p className="text-muted">Tomorrow's order is currently empty.</p>
+                <p className="text-muted">You have no baseline subscription items or overrides.</p>
               </div>
             ) : (
-              <div className="preview-receipt">
-                <div className="receipt-header">Scheduled Items</div>
-                <div className="receipt-list">
-                  {tomorrowActiveItems.map((item) => (
-                    <div key={item.id} className="receipt-row">
-                      <div className="receipt-item-details">
-                        <span>{item.emoji} {item.name} ({item.size})</span>
-                        {item.isModified && <span className="modified-indicator-tag">Override</span>}
+              <div className="receipt-checkout">
+                <div className="comparison-table-header">ORDER COMPARISON</div>
+                
+                {/* Comparison Table */}
+                <div className="comparison-table mt-2">
+                  <div className="comparison-row table-head">
+                    <span>Product</span>
+                    <span className="text-center">Baseline</span>
+                    <span className="text-center">Tomorrow</span>
+                    <span className="text-right">Difference</span>
+                  </div>
+
+                  {comparisonItems.map((item) => {
+                    const diffSign = item.difference > 0 ? `+${item.difference}` : item.difference;
+                    return (
+                      <div key={item.id} className={`comparison-row table-body-row ${item.difference !== 0 ? "modified" : ""}`}>
+                        <span className="p-title-row">{item.emoji} {item.name}</span>
+                        <span className="text-center">{item.baselineQty}</span>
+                        <span className="text-center font-bold">{item.overrideQty}</span>
+                        <span className={`text-right diff-val ${item.difference > 0 ? "positive" : item.difference < 0 ? "negative" : "neutral"}`}>
+                          {item.difference === 0 ? "No change" : `${diffSign} (₹${item.priceDiff.toFixed(2)})`}
+                        </span>
                       </div>
-                      <strong>{item.qty} x ₹{item.price.toFixed(2)}</strong>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div className="receipt-divider"></div>
 
-                <div className="receipt-footer">
-                  <div className="footer-row font-large">
-                    <span>Tomorrow's Total:</span>
+                <div className="receipt-summary">
+                  <div className="summary-row font-large">
+                    <span>Tomorrow's Total cost:</span>
                     <strong>₹{tomorrowTotalCost.toFixed(2)}</strong>
                   </div>
                 </div>
@@ -368,8 +422,39 @@ export function TomorrowChangesClientView({
         </div>
       </div>
 
+      {/* 5. Confirmation Dialog Modal */}
+      {showConfirmModal && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal-card">
+            <h3>Confirm Overrides</h3>
+            <p>You are about to save changes for tomorrow morning's order. This override will apply only to tomorrow's delivery.</p>
+            
+            <div className="comparison-preview-modal-list">
+              {comparisonItems.filter(i => i.difference !== 0).map((item) => {
+                const diffText = item.difference > 0 ? `increased by +${item.difference}` : `decreased by ${item.difference}`;
+                return (
+                  <div key={item.id} className="modal-list-item">
+                    <span>{item.emoji} {item.name}:</span>
+                    <strong>{diffText} ({item.baselineQty} → {item.overrideQty})</strong>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="modal-actions">
+              <button className="btn btn-outline" onClick={() => setShowConfirmModal(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={executeSaveOverrides}>
+                Confirm & Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style jsx>{`
-        .tomorrow-container {
+        .tomorrow-wrapper {
           display: flex;
           flex-direction: column;
           gap: 24px;
@@ -377,48 +462,64 @@ export function TomorrowChangesClientView({
 
         .tomorrow-grid {
           display: grid;
-          grid-template-columns: 1.5fr 1fr;
+          grid-template-columns: 1.5fr 1.1fr;
           gap: 32px;
           align-items: flex-start;
         }
 
         .tomorrow-header {
-          margin-bottom: 24px;
+          margin-bottom: 20px;
         }
 
-        /* Cutoff Warning styling */
-        .cutoff-banner {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-          padding: 16px;
-          border-radius: 8px;
-          margin-bottom: 24px;
-          font-size: 13px;
-        }
-
-        .cutoff-banner.active {
+        /* Cutoff progress Visualizer */
+        .cutoff-progress-banner {
           background: var(--accent-light);
           color: #B25E00;
           border: 1px solid var(--accent-color);
+          border-radius: 12px;
+          padding: 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          margin-bottom: 24px;
         }
 
-        .cutoff-banner.passed {
+        .cutoff-progress-banner.locked {
           background: var(--danger-light);
           color: var(--danger-color);
-          border: 1px solid var(--danger-color);
+          border-color: var(--danger-color);
         }
 
-        .banner-icon {
-          font-size: 24px;
+        .cutoff-banner-text {
+          display: flex;
+          justify-content: space-between;
+          font-size: 13px;
         }
 
-        .cutoff-banner p {
+        .progress-bar-bg {
+          background: rgba(0,0,0,0.1);
+          height: 6px;
+          border-radius: 3px;
+          overflow: hidden;
+        }
+
+        .progress-bar-fill {
+          background: var(--accent-color);
+          height: 100%;
+          border-radius: 3px;
+          transition: width 0.4s ease;
+        }
+
+        .locked .progress-bar-fill {
+          background: var(--danger-color);
+        }
+
+        .cutoff-sub-desc {
+          font-size: 10px;
           opacity: 0.9;
-          margin-top: 2px;
         }
 
-        /* Pause bar styling */
+        /* Daily Pause Bar */
         .pause-override-bar {
           display: flex;
           justify-content: space-between;
@@ -434,8 +535,8 @@ export function TomorrowChangesClientView({
           font-size: 11px;
         }
 
-        /* Product overrides listing */
-        .overrides-products-list {
+        /* Overrides list */
+        .products-override-list {
           display: flex;
           flex-direction: column;
           gap: 16px;
@@ -444,7 +545,7 @@ export function TomorrowChangesClientView({
           padding-right: 4px;
         }
 
-        .override-product-row {
+        .override-row {
           display: flex;
           justify-content: space-between;
           align-items: center;
@@ -452,35 +553,36 @@ export function TomorrowChangesClientView({
           border-bottom: 1px solid var(--border-light);
         }
 
-        .override-product-row:last-child {
+        .override-row:last-child {
           border-bottom: none;
           padding-bottom: 0;
         }
 
-        .product-details {
+        .override-p-info {
           display: flex;
           align-items: center;
           gap: 16px;
         }
 
-        .product-emoji {
-          font-size: 26px;
+        .override-p-emoji {
+          font-size: 24px;
+          width: 44px;
+          height: 44px;
           background: var(--border-light);
-          width: 48px;
-          height: 48px;
+          border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
-          border-radius: 50%;
+          flex-shrink: 0;
         }
 
-        .product-price {
-          font-size: 13px;
+        .override-p-meta {
+          font-size: 12px;
           margin-top: 2px;
         }
 
-        .baseline-indicator {
-          background: var(--border-light);
+        .badge-baseline {
+          background: var(--border-color);
           color: var(--text-muted);
           padding: 1px 6px;
           border-radius: 4px;
@@ -489,29 +591,23 @@ export function TomorrowChangesClientView({
           display: inline-block;
         }
 
-        .override-controls {
+        .override-actions {
           display: flex;
           align-items: center;
           gap: 12px;
         }
 
-        .btn-reset-override {
+        .btn-reset {
           background: transparent;
           border: none;
           color: var(--danger-color);
           font-size: 12px;
           font-weight: 600;
           cursor: pointer;
-          padding: 4px 8px;
-          border-radius: 4px;
-          transition: background 0.2s;
+          padding: 4px;
         }
 
-        .btn-reset-override:hover {
-          background: var(--danger-light);
-        }
-
-        .quantity-selector {
+        .qty-selector {
           display: flex;
           align-items: center;
           gap: 12px;
@@ -522,8 +618,8 @@ export function TomorrowChangesClientView({
         }
 
         .qty-btn {
-          width: 32px;
-          height: 32px;
+          width: 30px;
+          height: 30px;
           border-radius: 50%;
           border: none;
           background: var(--bg-card);
@@ -531,55 +627,47 @@ export function TomorrowChangesClientView({
           font-weight: bold;
           cursor: pointer;
           box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-          display: flex;
-          align-items: center;
-          justify-content: center;
         }
 
-        .qty-btn:hover:not(:disabled) {
+        .qty-btn:hover {
           background: var(--primary-light);
           color: var(--primary-color);
         }
 
-        .qty-btn:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-
         .qty-val {
           font-weight: 600;
-          width: 24px;
+          width: 20px;
           text-align: center;
+          font-size: 13px;
         }
 
-        .tomorrow-paused-screen {
+        .paused-container {
           text-align: center;
           padding: 48px 24px;
           background: var(--border-light);
-          border-radius: 8px;
+          border-radius: 12px;
           border: 1px dashed var(--border-color);
         }
 
         .paused-icon {
-          font-size: 48px;
+          font-size: 40px;
           display: block;
-          margin-bottom: 12px;
+          margin-bottom: 8px;
         }
 
-        /* Preview Panel */
-        .tomorrow-preview-box {
-          margin-top: 20px;
+        /* Preview Panel receipt */
+        .preview-receipt-wrapper {
           background: var(--border-light);
           padding: 20px;
-          border-radius: 8px;
+          border-radius: 12px;
           border: 1px solid var(--border-color);
-          min-height: 200px;
+          min-height: 250px;
           display: flex;
           align-items: center;
           justify-content: center;
         }
 
-        .vacation-preview, .paused-preview, .empty-preview {
+        .status-screen {
           text-align: center;
           display: flex;
           flex-direction: column;
@@ -587,67 +675,84 @@ export function TomorrowChangesClientView({
           gap: 8px;
         }
 
-        .vacation-icon, .pause-icon, .empty-icon {
+        .screen-icon {
           font-size: 40px;
         }
 
-        .preview-receipt {
+        .receipt-checkout {
           width: 100%;
           display: flex;
           flex-direction: column;
           gap: 16px;
         }
 
-        .receipt-header {
+        .comparison-table-header {
           font-size: 11px;
           font-weight: bold;
           color: var(--text-muted);
           letter-spacing: 0.05em;
           border-bottom: 1px solid var(--border-color);
-          padding-bottom: 6px;
+          padding-bottom: 8px;
           text-transform: uppercase;
         }
 
-        .receipt-list {
+        .comparison-table {
           display: flex;
           flex-direction: column;
-          gap: 12px;
-        }
-
-        .receipt-row {
-          display: flex;
-          justify-content: space-between;
-          font-size: 14px;
-          align-items: center;
-        }
-
-        .receipt-item-details {
-          display: flex;
-          align-items: center;
           gap: 8px;
         }
 
-        .modified-indicator-tag {
-          font-size: 9px;
-          background: var(--accent-light);
-          color: #B25E00;
-          font-weight: bold;
-          padding: 1px 4px;
-          border-radius: 4px;
+        .comparison-row {
+          display: grid;
+          grid-template-columns: 2fr 1fr 1fr 1.5fr;
+          font-size: 13px;
+          align-items: center;
         }
+
+        .comparison-row.table-head {
+          font-weight: 600;
+          color: var(--text-muted);
+          border-bottom: 1px solid var(--border-color);
+          padding-bottom: 6px;
+        }
+
+        .comparison-row.table-body-row {
+          border-bottom: 1px solid rgba(0,0,0,0.03);
+          padding: 6px 0;
+        }
+
+        .comparison-row.table-body-row.modified {
+          background: var(--accent-light);
+          border-radius: 4px;
+          padding: 6px 4px;
+        }
+
+        .p-title-row {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .diff-val.positive { color: var(--primary-color); font-weight: 600; }
+        .diff-val.negative { color: var(--danger-color); font-weight: 600; }
+        .diff-val.neutral { color: var(--text-muted); }
+
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .font-bold { font-weight: bold; }
 
         .receipt-divider {
           border-top: 1px dashed var(--border-color);
           margin: 8px 0;
         }
 
-        .receipt-footer {
+        .receipt-summary {
           display: flex;
           flex-direction: column;
           gap: 8px;
         }
 
-        .footer-row.font-large {
+        .summary-row.font-large {
           font-size: 16px;
           font-weight: 700;
           color: var(--text-main);
@@ -666,6 +771,25 @@ export function TomorrowChangesClientView({
           border-left: 4px solid var(--accent-color);
         }
 
+        /* Modal list preview */
+        .comparison-preview-modal-list {
+          margin: 16px 0;
+          background: var(--border-light);
+          padding: 12px;
+          border-radius: 8px;
+          max-height: 180px;
+          overflow-y: auto;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .modal-list-item {
+          display: flex;
+          justify-content: space-between;
+          font-size: 13px;
+        }
+
         .block-alert {
           display: block;
           text-align: center;
@@ -674,12 +798,6 @@ export function TomorrowChangesClientView({
 
         .w-full {
           width: 100%;
-        }
-
-        @media (max-width: 900px) {
-          .tomorrow-grid {
-            grid-template-columns: 1fr;
-          }
         }
       `}</style>
     </div>

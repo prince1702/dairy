@@ -33,6 +33,15 @@ export function VacationModeClientView({
   const [vacationSuccess, setVacationSuccess] = useState("");
   const [vacationError, setVacationError] = useState("");
 
+  // Confirmation modal state
+  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+
+  // Focus states for floating labels
+  const [focusStart, setFocusStart] = useState(false);
+  const [focusEnd, setFocusEnd] = useState(false);
+  const [focusReason, setFocusReason] = useState(false);
+
   const handleVacationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!vacationStart || !vacationEnd) {
@@ -71,15 +80,21 @@ export function VacationModeClientView({
     }
   };
 
-  const handleCancelVacation = async (vacationId: string) => {
-    if (!confirm("Are you sure you want to resume deliveries?")) return;
+  const triggerCancelConfirm = (id: string) => {
+    setConfirmCancelId(id);
+    setShowCancelModal(true);
+  };
 
+  const executeCancelVacation = async () => {
+    if (!confirmCancelId) return;
+
+    setShowCancelModal(false);
     setVacationSubmitting(true);
     setVacationError("");
     setVacationSuccess("");
 
     try {
-      const res = await cancelVacation(customer.id, vacationId);
+      const res = await cancelVacation(customer.id, confirmCancelId);
       setVacationSubmitting(false);
 
       if (res.success) {
@@ -91,6 +106,8 @@ export function VacationModeClientView({
     } catch (err: any) {
       setVacationSubmitting(false);
       setVacationError(err.message || "An error occurred.");
+    } finally {
+      setConfirmCancelId(null);
     }
   };
 
@@ -121,117 +138,134 @@ export function VacationModeClientView({
           {vacationError && <div className="badge badge-danger mb-4 block-alert">{vacationError}</div>}
           {vacationSuccess && <div className="badge badge-success mb-4 block-alert">{vacationSuccess}</div>}
 
-          <form onSubmit={handleVacationSubmit} className="mt-4">
-            <div className="form-group">
-              <label className="form-label">Vacation Start Date</label>
+          <form onSubmit={handleVacationSubmit} className="mt-6">
+            {/* Floating label for Start Date */}
+            <div className={`floating-form-group ${focusStart || vacationStart ? "focused" : ""}`}>
+              <label className="floating-label active-float">Vacation Start Date</label>
               <input
                 type="date"
-                className="form-input"
+                className="form-input floating-input"
                 value={vacationStart}
                 onChange={(e) => setVacationStart(e.target.value)}
+                onFocus={() => setFocusStart(true)}
+                onBlur={() => setFocusStart(false)}
                 disabled={vacationSubmitting}
                 required
               />
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Vacation End Date</label>
+            {/* Floating label for End Date */}
+            <div className={`floating-form-group ${focusEnd || vacationEnd ? "focused" : ""}`}>
+              <label className="floating-label active-float">Vacation End Date</label>
               <input
                 type="date"
-                className="form-input"
+                className="form-input floating-input"
                 value={vacationEnd}
                 onChange={(e) => setVacationEnd(e.target.value)}
+                onFocus={() => setFocusEnd(true)}
+                onBlur={() => setFocusEnd(false)}
                 disabled={vacationSubmitting}
                 required
               />
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Reason for Vacation (Optional)</label>
+            {/* Floating label for Reason */}
+            <div className={`floating-form-group ${focusReason || reason ? "focused" : ""}`}>
+              <label className="floating-label select-label">Reason for Vacation (Optional)</label>
               <select
-                className="form-input"
+                className="form-input floating-input"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
+                onFocus={() => setFocusReason(true)}
+                onBlur={() => setFocusReason(false)}
                 disabled={vacationSubmitting}
               >
                 <option value="">Select a reason...</option>
-                <option value="traveling">Traveling / Out of Town</option>
-                <option value="health">Health Reasons</option>
-                <option value="seasonal">Seasonal Pause</option>
-                <option value="other">Other</option>
+                <option value="traveling">✈️ Traveling / Out of Town</option>
+                <option value="health">🏥 Health Reasons</option>
+                <option value="seasonal">❄️ Seasonal Pause</option>
+                <option value="other">⚙️ Other</option>
               </select>
             </div>
 
-            <button type="submit" className="btn btn-primary w-full mt-4" disabled={vacationSubmitting}>
+            <button type="submit" className="btn btn-primary w-full mt-6" disabled={vacationSubmitting}>
               {vacationSubmitting ? "Scheduling Vacation..." : "Go on Vacation ✈️"}
             </button>
           </form>
         </div>
 
-        {/* Right Side: Vacation lists */}
+        {/* Right Side: Timeline and list */}
         <div className="vacation-lists-panel">
-          {/* Active & Upcoming Vacations */}
+          {/* Active & Upcoming Vacations Timeline */}
           <div className="card mb-6">
-            <h3>Upcoming & Active Vacations</h3>
-            <p className="text-muted">Scheduled periods where deliveries are suspended.</p>
+            <h3>Vacation Timeline</h3>
+            <p className="text-muted">Visual track of your scheduled vacation pauses.</p>
 
-            <div className="vacation-list mt-4">
+            <div className="timeline-wrapper mt-6">
               {activeOrUpcomingVacations.length === 0 ? (
                 <p className="no-records text-muted">No active or upcoming vacations scheduled.</p>
               ) : (
-                activeOrUpcomingVacations.map((v) => {
-                  const start = new Date(v.startDate);
-                  const end = new Date(v.endDate);
-                  const isActive = start <= now && end >= now;
+                <div className="vertical-timeline">
+                  {activeOrUpcomingVacations.map((v, index) => {
+                    const start = new Date(v.startDate);
+                    const end = new Date(v.endDate);
+                    const isActive = start <= now && end >= now;
 
-                  return (
-                    <div key={v.id} className="vacation-item-card">
-                      <div className="vacation-item-details">
-                        <div className="date-range">
-                          📅 {start.toLocaleDateString()} — {end.toLocaleDateString()}
+                    return (
+                      <div key={v.id} className="timeline-node">
+                        <div className="timeline-badge-column">
+                          <div className={`timeline-dot ${isActive ? "active" : ""}`}></div>
+                          {index < activeOrUpcomingVacations.length - 1 && <div className="timeline-line"></div>}
                         </div>
-                        <div className="vacation-status-badge">
-                          {isActive ? (
-                            <span className="badge badge-success">Active Now</span>
-                          ) : (
-                            <span className="badge badge-warning">Upcoming</span>
-                          )}
+                        
+                        <div className="timeline-content-card">
+                          <div className="timeline-date-range">
+                            {start.toLocaleDateString([], {month:'short', day:'numeric'})} — {end.toLocaleDateString([], {month:'short', day:'numeric', year:'numeric'})}
+                          </div>
+                          
+                          <div className="timeline-status-badge">
+                            {isActive ? (
+                              <span className="badge badge-success">Active Now</span>
+                            ) : (
+                              <span className="badge badge-warning">Upcoming</span>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => triggerCancelConfirm(v.id)}
+                            disabled={vacationSubmitting}
+                            className="btn btn-outline btn-sm resume-early-btn mt-2"
+                          >
+                            {isActive ? "Resume Early 🔌" : "Cancel Plan ❌"}
+                          </button>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleCancelVacation(v.id)}
-                        disabled={vacationSubmitting}
-                        className="btn btn-outline btn-sm btn-resume"
-                      >
-                        {isActive ? "Resume Early 🔌" : "Cancel Plan ❌"}
-                      </button>
-                    </div>
-                  );
-                })
+                    );
+                  })}
+                </div>
               )}
             </div>
           </div>
 
-          {/* Vacation History */}
+          {/* Historical Log */}
           <div className="card">
-            <h3>Vacation History</h3>
-            <p className="text-muted">Record of your past vacation pauses.</p>
+            <h3>Past Vacations</h3>
+            <p className="text-muted">A record of your completed vacation pauses.</p>
 
-            <div className="vacation-list mt-4">
+            <div className="vacation-list-history mt-4">
               {pastVacations.length === 0 ? (
-                <p className="no-records text-muted">No historical vacation records found.</p>
+                <p className="no-records text-muted">No past vacations found.</p>
               ) : (
                 pastVacations.map((v) => {
                   const start = new Date(v.startDate);
                   const end = new Date(v.endDate);
-
                   return (
-                    <div key={v.id} className="vacation-history-row">
-                      <span className="calendar-check">✓</span>
+                    <div key={v.id} className="history-row">
+                      <span className="history-check">✓</span>
                       <div>
                         <strong>{start.toLocaleDateString()} to {end.toLocaleDateString()}</strong>
-                        <p className="text-muted" style={{ fontSize: "11px" }}>Completed</p>
+                        <p className="text-muted">Completed pause period.</p>
                       </div>
                     </div>
                   );
@@ -242,6 +276,24 @@ export function VacationModeClientView({
         </div>
       </div>
 
+      {/* Cancel Confirmation Modal */}
+      {showCancelModal && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal-card">
+            <h3>Confirm Delivery Resumption</h3>
+            <p>Are you sure you want to end this vacation pause early? Deliveries will resume starting tomorrow morning (subject to standard 10:00 PM cutoff time).</p>
+            <div className="modal-actions">
+              <button className="btn btn-outline" onClick={() => setShowCancelModal(false)}>
+                Go Back
+              </button>
+              <button className="btn btn-primary" onClick={executeCancelVacation}>
+                Confirm Resumption
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style jsx>{`
         .vacation-container {
           display: flex;
@@ -251,7 +303,7 @@ export function VacationModeClientView({
 
         .vacation-grid {
           display: grid;
-          grid-template-columns: 1fr 1.2fr;
+          grid-template-columns: 1fr 1.3fr;
           gap: 32px;
           align-items: flex-start;
         }
@@ -260,74 +312,148 @@ export function VacationModeClientView({
           margin-bottom: 24px;
         }
 
-        .vacation-list {
+        /* Floating labels */
+        .floating-form-group {
+          position: relative;
+          margin-bottom: 20px;
+        }
+
+        .floating-label {
+          position: absolute;
+          left: 16px;
+          top: 14px;
+          font-size: 14px;
+          color: var(--text-muted);
+          pointer-events: none;
+          transition: transform 0.2s, font-size 0.2s, color 0.2s;
+        }
+
+        .floating-input {
+          padding-top: 20px;
+          padding-bottom: 6px;
+        }
+
+        /* date and selects labels need to float immediately */
+        .floating-form-group.focused .floating-label,
+        .floating-form-group .floating-label.active-float,
+        .floating-form-group .floating-label.select-label {
+          transform: translateY(-8px) scale(0.85);
+          transform-origin: top left;
+          color: var(--primary-color);
+        }
+
+        /* Timeline styling */
+        .timeline-wrapper {
           display: flex;
           flex-direction: column;
-          gap: 14px;
         }
 
-        .no-records {
-          font-size: 13px;
-          font-style: italic;
-          padding: 12px 0;
-        }
-
-        .vacation-item-card {
+        .vertical-timeline {
           display: flex;
-          justify-content: space-between;
-          align-items: center;
-          background: var(--border-light);
-          padding: 16px;
-          border-radius: 8px;
-          border: 1px solid var(--border-color);
+          flex-direction: column;
+          gap: 24px;
+          position: relative;
+          padding-left: 8px;
         }
 
-        .vacation-item-details {
+        .timeline-node {
+          display: flex;
+          gap: 16px;
+        }
+
+        .timeline-badge-column {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          position: relative;
+        }
+
+        .timeline-dot {
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          background: var(--border-color);
+          border: 3px solid var(--bg-card);
+          z-index: 2;
+        }
+
+        .timeline-dot.active {
+          background: var(--primary-color);
+          box-shadow: 0 0 0 4px var(--primary-light);
+        }
+
+        .timeline-line {
+          position: absolute;
+          top: 14px;
+          bottom: -24px;
+          width: 2px;
+          background: var(--border-color);
+          z-index: 1;
+        }
+
+        .timeline-content-card {
+          flex: 1;
+          background: var(--border-light);
+          border: 1px solid var(--border-color);
+          padding: 16px;
+          border-radius: 12px;
           display: flex;
           flex-direction: column;
           gap: 6px;
         }
 
-        .date-range {
-          font-weight: 600;
-          font-size: 14px;
+        .timeline-date-range {
+          font-weight: 700;
+          font-size: 15px;
           color: var(--text-main);
         }
 
-        .vacation-status-badge {
+        .timeline-status-badge {
           align-self: flex-start;
         }
 
-        .btn-resume {
-          padding: 6px 12px;
+        .resume-early-btn {
+          align-self: flex-start;
           font-size: 11px;
+          padding: 6px 12px;
           border-radius: 6px;
         }
 
-        /* History items */
-        .vacation-history-row {
+        /* Historical Log styling */
+        .vacation-list-history {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .history-row {
           display: flex;
           align-items: center;
           gap: 12px;
-          padding: 10px 0;
+          padding: 8px 0;
           border-bottom: 1px dashed var(--border-light);
         }
 
-        .vacation-history-row:last-child {
+        .history-row:last-child {
           border-bottom: none;
         }
 
-        .calendar-check {
+        .history-check {
           color: var(--primary-color);
           background: var(--primary-light);
           width: 24px;
           height: 24px;
+          border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
-          border-radius: 50%;
-          font-weight: bold;
           font-size: 12px;
+          font-weight: bold;
+        }
+
+        .no-records {
+          font-size: 13px;
+          font-style: italic;
         }
 
         .block-alert {

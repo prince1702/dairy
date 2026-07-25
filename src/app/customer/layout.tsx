@@ -44,11 +44,20 @@ export default async function CustomerLayout({
     select: { balance: true },
   });
 
+  // Check if subscription has any active baseline items
+  const activeSub = await prisma.subscription.findFirst({
+    where: { customerId, status: "ACTIVE" },
+    include: { items: true },
+  });
+
+  const isSubscriptionActive = !!(activeSub && activeSub.items.some(item => item.quantity > 0));
+
   return (
     <CustomerLayoutClient
       customer={customer}
       walletBalance={wallet?.balance || 0}
       unreadNotifications={unreadCount}
+      isSubscriptionActive={isSubscriptionActive}
     >
       {children}
     </CustomerLayoutClient>

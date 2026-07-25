@@ -48,8 +48,20 @@ export function WalletClientView({
   const filteredTransactions = transactions.filter((tx) => {
     if (activeTab === "ALL") return true;
     if (activeTab === "DEDUCTIONS") return tx.source === "DELIVERY_DEDUCTION";
-    return false; // Recharges are handled in the separate paymentRequests table
+    return false;
   });
+
+  // Calculate wallet runway analytics
+  const dailyDeductions = transactions.filter(t => t.source === "DELIVERY_DEDUCTION");
+  const averageDeliveryCost = dailyDeductions.length > 0 
+    ? Math.abs(dailyDeductions.reduce((sum, t) => sum + t.changeAmount, 0) / dailyDeductions.length) 
+    : 0;
+
+  const runwayDays = averageDeliveryCost > 0 && wallet 
+    ? Math.floor(wallet.balance / averageDeliveryCost) 
+    : 0;
+
+  const totalAutoDeductions = dailyDeductions.length;
 
   return (
     <div className="wallet-container">
@@ -60,9 +72,9 @@ export function WalletClientView({
           <h2 className="hero-balance">₹{wallet?.balance.toFixed(2) || "0.00"}</h2>
           <p className="hero-subtext">
             {wallet && wallet.balance < 150 ? (
-              <span className="low-bal-warning">⚠️ Low Balance Alert! Please top up to prevent delivery pauses.</span>
+              <span className="low-bal-warning">⚠️ Low Balance! Top up soon to prevent delivery interruption.</span>
             ) : (
-              "Your balance will be debited automatically after each delivery."
+              "Secure auto-deduction active for daily morning silent deliveries."
             )}
           </p>
         </div>
@@ -73,7 +85,32 @@ export function WalletClientView({
         </div>
       </div>
 
-      {/* Tabs Selector */}
+      {/* Wallet Analytics Grid Section */}
+      <div className="wallet-analytics-grid">
+        <div className="analytics-card card">
+          <span className="analytics-icon">📊</span>
+          <div className="analytics-data">
+            <strong>₹{averageDeliveryCost.toFixed(2)}</strong>
+            <span className="text-muted">Average Delivery Cost</span>
+          </div>
+        </div>
+        <div className="analytics-card card">
+          <span className="analytics-icon">🗓️</span>
+          <div className="analytics-data">
+            <strong>{runwayDays > 0 ? `${runwayDays} Days` : "N/A"}</strong>
+            <span className="text-muted">Estimated Wallet Runway</span>
+          </div>
+        </div>
+        <div className="analytics-card card">
+          <span className="analytics-icon">🔄</span>
+          <div className="analytics-data">
+            <strong>{totalAutoDeductions} debits</strong>
+            <span className="text-muted">Total Auto-Deductions</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs Selector Card */}
       <div className="wallet-tabs-card card">
         <div className="tabs-header">
           <button
@@ -99,38 +136,44 @@ export function WalletClientView({
         {/* Transactions / Recharges Content */}
         <div className="tabs-content">
           {activeTab !== "RECHARGES" ? (
-            <div className="transactions-list">
+            <div className="timeline-wrapper">
               {filteredTransactions.length === 0 ? (
                 <p className="empty-text text-center py-6 text-muted">No transactions recorded yet.</p>
               ) : (
-                filteredTransactions.map((tx) => {
-                  const isCredit = tx.changeAmount > 0;
-                  return (
-                    <div key={tx.id} className="tx-item-row">
-                      <div className="tx-item-left">
-                        <span className={`tx-icon-badge ${isCredit ? "credit" : "debit"}`}>
-                          {isCredit ? "📥" : "📤"}
-                        </span>
-                        <div>
-                          <strong className="tx-desc">{tx.description || tx.source}</strong>
-                          <div className="tx-time text-muted">
-                            {new Date(tx.timestamp).toLocaleDateString()} at{" "}
-                            {new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                <div className="vertical-timeline">
+                  {filteredTransactions.map((tx, index) => {
+                    const isCredit = tx.changeAmount > 0;
+                    const date = new Date(tx.timestamp);
+                    return (
+                      <div key={tx.id} className="timeline-item">
+                        <div className="timeline-badge-col">
+                          <span className={`timeline-badge-circle ${isCredit ? "credit" : "debit"}`}>
+                            {isCredit ? "📥" : "📤"}
+                          </span>
+                          {index < filteredTransactions.length - 1 && <div className="timeline-connector-line"></div>}
+                        </div>
+
+                        <div className="timeline-content-box">
+                          <div className="timeline-header-row">
+                            <strong className="tx-description-label">{tx.description || tx.source}</strong>
+                            <span className={`tx-amount-display ${isCredit ? "positive" : "negative"}`}>
+                              {isCredit ? "+" : ""}₹{tx.changeAmount.toFixed(2)}
+                            </span>
+                          </div>
+                          
+                          <div className="timeline-sub-row">
+                            <span className="tx-time-stamp text-muted">
+                              {date.toLocaleDateString()} at {date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </span>
+                            <span className="tx-audit-trail text-muted">
+                              Bal: ₹{tx.beforeBalance.toFixed(2)} → ₹{tx.afterBalance.toFixed(2)}
+                            </span>
                           </div>
                         </div>
                       </div>
-
-                      <div className="tx-item-right">
-                        <span className={`tx-change ${isCredit ? "positive" : "negative"}`}>
-                          {isCredit ? "+" : ""}₹{tx.changeAmount.toFixed(2)}
-                        </span>
-                        <span className="tx-audit text-muted">
-                          Bal: ₹{tx.beforeBalance.toFixed(2)} → ₹{tx.afterBalance.toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })
+                    );
+                  })}
+                </div>
               )}
             </div>
           ) : (
@@ -143,7 +186,7 @@ export function WalletClientView({
                     <tr>
                       <th>Submitted Date</th>
                       <th>Amount</th>
-                      <th>Receipt</th>
+                      <th>Receipt screenshot</th>
                       <th>Status</th>
                     </tr>
                   </thead>
@@ -182,7 +225,7 @@ export function WalletClientView({
         /* Hero Card Styling */
         .wallet-hero-card {
           background: linear-gradient(135deg, var(--primary-color) 0%, #0d4624 100%);
-          border-radius: var(--radius, 12px);
+          border-radius: 12px;
           color: white;
           padding: 32px;
           display: flex;
@@ -226,6 +269,46 @@ export function WalletClientView({
           font-size: 15px;
         }
 
+        /* Analytics Grid */
+        .wallet-analytics-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+          gap: 20px;
+        }
+
+        .analytics-card {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          padding: 16px 20px;
+        }
+
+        .analytics-icon {
+          font-size: 24px;
+          width: 44px;
+          height: 44px;
+          background: var(--border-light);
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .analytics-data {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .analytics-data strong {
+          font-size: 18px;
+          color: var(--text-main);
+        }
+
+        .analytics-data span {
+          font-size: 12px;
+        }
+
         /* Tabs Card Styling */
         .wallet-tabs-card {
           display: flex;
@@ -265,83 +348,101 @@ export function WalletClientView({
           font-weight: 600;
         }
 
-        /* Transactions list styling */
-        .transactions-list {
+        /* Vertical timeline styling */
+        .timeline-wrapper {
           display: flex;
           flex-direction: column;
-          gap: 12px;
         }
 
-        .tx-item-row {
+        .vertical-timeline {
           display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 16px 0;
-          border-bottom: 1px solid var(--border-light);
+          flex-direction: column;
+          gap: 20px;
+          padding-left: 8px;
         }
 
-        .tx-item-row:last-child {
-          border-bottom: none;
-        }
-
-        .tx-item-left {
+        .timeline-item {
           display: flex;
-          align-items: center;
           gap: 16px;
         }
 
-        .tx-icon-badge {
-          width: 40px;
-          height: 40px;
+        .timeline-badge-col {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          position: relative;
+        }
+
+        .timeline-badge-circle {
+          width: 32px;
+          height: 32px;
           border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 18px;
+          font-size: 14px;
+          background: var(--border-light);
+          z-index: 2;
         }
 
-        .tx-icon-badge.credit {
+        .timeline-badge-circle.credit {
           background: var(--primary-light);
           color: var(--primary-color);
         }
 
-        .tx-icon-badge.debit {
+        .timeline-badge-circle.debit {
           background: var(--danger-light);
           color: var(--danger-color);
         }
 
-        .tx-desc {
-          font-size: 15px;
-          color: var(--text-main);
+        .timeline-connector-line {
+          position: absolute;
+          top: 32px;
+          bottom: -20px;
+          width: 2px;
+          background: var(--border-color);
+          z-index: 1;
         }
 
-        .tx-time {
-          font-size: 12px;
-          margin-top: 2px;
-        }
-
-        .tx-item-right {
+        .timeline-content-box {
+          flex: 1;
+          background: var(--border-light);
+          border: 1px solid var(--border-color);
+          padding: 14px 16px;
+          border-radius: 12px;
           display: flex;
           flex-direction: column;
-          align-items: flex-end;
           gap: 4px;
         }
 
-        .tx-change {
-          font-size: 16px;
+        .timeline-header-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .tx-description-label {
+          font-size: 14px;
+          color: var(--text-main);
+        }
+
+        .tx-amount-display {
+          font-size: 15px;
           font-weight: 700;
         }
 
-        .tx-change.positive {
+        .tx-amount-display.positive {
           color: var(--primary-color);
         }
 
-        .tx-change.negative {
+        .tx-amount-display.negative {
           color: var(--danger-color);
         }
 
-        .tx-audit {
-          font-size: 10px;
+        .timeline-sub-row {
+          display: flex;
+          justify-content: space-between;
+          font-size: 11px;
         }
 
         /* Table styling for Recharges */
@@ -380,7 +481,7 @@ export function WalletClientView({
           text-decoration: underline;
         }
 
-        /* Status Badge colors */
+        /* Status badges */
         .status-badge-pending {
           background: var(--accent-light);
           color: #B25E00;

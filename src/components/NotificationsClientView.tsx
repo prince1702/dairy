@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { markNotificationsRead, deleteNotification } from "@/app/customer-actions";
+import {
+  markNotificationsRead,
+  deleteNotification,
+  clearAllNotifications,
+  markNotificationReadSingle
+} from "@/app/customer-actions";
 import { useRouter } from "next/navigation";
 
 interface Notification {
@@ -28,6 +33,7 @@ export function NotificationsClientView({
 }: NotificationsClientViewProps) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState<"ALL" | "WALLET" | "DELIVERY" | "SYSTEM">("ALL");
 
   const handleMarkAllRead = async () => {
     setSubmitting(true);
@@ -43,7 +49,36 @@ export function NotificationsClientView({
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleClearAll = async () => {
+    if (!confirm("Are you sure you want to delete all notifications? This cannot be undone.")) return;
+    setSubmitting(true);
+    try {
+      const res = await clearAllNotifications(customer.id);
+      if (res.success) {
+        router.refresh();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleMarkSingleRead = async (id: string) => {
+    setSubmitting(true);
+    try {
+      const res = await markNotificationReadSingle(customer.id, id);
+      if (res.success) {
+        router.refresh();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteSingle = async (id: string) => {
     setSubmitting(true);
     try {
       const res = await deleteNotification(customer.id, id);
@@ -57,6 +92,12 @@ export function NotificationsClientView({
     }
   };
 
+  // Filters notifications
+  const filteredNotifications = notifications.filter((n) => {
+    if (activeTab === "ALL") return true;
+    return n.type.toUpperCase() === activeTab;
+  });
+
   const getNotifIcon = (type: string) => {
     const t = type.toLowerCase();
     if (t.includes("wallet") || t.includes("recharge")) return "💰";
@@ -69,27 +110,68 @@ export function NotificationsClientView({
     <div className="notifications-container card">
       <div className="notifications-header">
         <div>
-          <h3>All Notifications</h3>
-          <p className="text-muted">Stay updated with your daily deliveries, payment credits, and account configurations.</p>
+          <h3>Notifications & Activity Alerts</h3>
+          <p className="text-muted">Manage your daily delivery reports, credits, and system audit logs.</p>
         </div>
-        {notifications.some(n => !n.isRead) && (
-          <button
-            onClick={handleMarkAllRead}
-            disabled={submitting}
-            className="btn btn-outline mark-read-btn"
-          >
-            Mark All Read ✓
-          </button>
-        )}
+        
+        {/* Header Action Row */}
+        <div className="header-actions">
+          {notifications.some((n) => !n.isRead) && (
+            <button
+              onClick={handleMarkAllRead}
+              disabled={submitting}
+              className="btn btn-outline mark-read-btn"
+            >
+              Mark All Read ✓
+            </button>
+          )}
+          {notifications.length > 0 && (
+            <button
+              onClick={handleClearAll}
+              disabled={submitting}
+              className="btn btn-danger clear-all-btn"
+            >
+              Clear All Logs 🗑️
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="notifications-list mt-6">
-        {notifications.length === 0 ? (
+      {/* Tab Filter Links */}
+      <div className="notifications-tabs mt-6">
+        <button
+          className={`tab-btn-item ${activeTab === "ALL" ? "active" : ""}`}
+          onClick={() => setActiveTab("ALL")}
+        >
+          All Alerts ({notifications.length})
+        </button>
+        <button
+          className={`tab-btn-item ${activeTab === "DELIVERY" ? "active" : ""}`}
+          onClick={() => setActiveTab("DELIVERY")}
+        >
+          Deliveries ({notifications.filter(n => n.type.toUpperCase() === "DELIVERY").length})
+        </button>
+        <button
+          className={`tab-btn-item ${activeTab === "WALLET" ? "active" : ""}`}
+          onClick={() => setActiveTab("WALLET")}
+        >
+          Wallet Credits ({notifications.filter(n => n.type.toUpperCase() === "WALLET").length})
+        </button>
+        <button
+          className={`tab-btn-item ${activeTab === "SYSTEM" ? "active" : ""}`}
+          onClick={() => setActiveTab("SYSTEM")}
+        >
+          System Updates ({notifications.filter(n => n.type.toUpperCase() === "SYSTEM").length})
+        </button>
+      </div>
+
+      <div className="notifications-list mt-4">
+        {filteredNotifications.length === 0 ? (
           <div className="no-notifications py-8 text-center text-muted">
-            📭 No notifications or logs found.
+            📭 No matching notifications or alerts found.
           </div>
         ) : (
-          notifications.map((notif) => {
+          filteredNotifications.map((notif) => {
             const time = new Date(notif.timestamp);
             return (
               <div
@@ -97,6 +179,7 @@ export function NotificationsClientView({
                 className={`notif-item-row ${notif.type.toLowerCase()} ${notif.isRead ? "read" : "unread"}`}
               >
                 <span className="notif-icon-avatar">{getNotifIcon(notif.type)}</span>
+                
                 <div className="notif-content-col">
                   <div className="notif-meta-title-row">
                     <strong className="notif-title">{notif.title}</strong>
@@ -106,12 +189,26 @@ export function NotificationsClientView({
                     </span>
                   </div>
                   <p className="notif-message-text">{notif.message}</p>
+                  
+                  {/* Mark single as read button if unread */}
+                  {!notif.isRead && (
+                    <button
+                      type="button"
+                      onClick={() => handleMarkSingleRead(notif.id)}
+                      disabled={submitting}
+                      className="mark-single-read-btn mt-2"
+                    >
+                      Mark as Read
+                    </button>
+                  )}
                 </div>
+
                 <button
-                  onClick={() => handleDelete(notif.id)}
+                  onClick={() => handleDeleteSingle(notif.id)}
                   disabled={submitting}
                   className="delete-notif-btn"
                   title="Delete notification"
+                  aria-label="Delete notification"
                 >
                   ✕
                 </button>
@@ -133,12 +230,50 @@ export function NotificationsClientView({
           align-items: center;
           gap: 16px;
           flex-wrap: wrap;
+          border-bottom: 1px solid var(--border-color);
+          padding-bottom: 16px;
         }
 
-        .mark-read-btn {
+        .header-actions {
+          display: flex;
+          gap: 8px;
+        }
+
+        .mark-read-btn, .clear-all-btn {
           padding: 8px 16px;
           font-size: 13px;
           border-radius: 8px;
+        }
+
+        /* Tabs styling */
+        .notifications-tabs {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+
+        .tab-btn-item {
+          padding: 6px 12px;
+          background: transparent;
+          border: 1px solid var(--border-color);
+          color: var(--text-muted);
+          border-radius: 8px;
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 500;
+          transition: all 0.2s;
+        }
+
+        .tab-btn-item:hover {
+          background: var(--border-light);
+          color: var(--text-main);
+        }
+
+        .tab-btn-item.active {
+          background: var(--primary-light);
+          color: var(--primary-color);
+          border-color: var(--primary-color);
+          font-weight: 600;
         }
 
         .notifications-list {
@@ -174,7 +309,7 @@ export function NotificationsClientView({
         }
 
         .notif-item-row.read {
-          opacity: 0.8;
+          opacity: 0.75;
         }
 
         .notif-icon-avatar {
@@ -221,6 +356,21 @@ export function NotificationsClientView({
           line-height: 1.5;
         }
 
+        .mark-single-read-btn {
+          background: transparent;
+          border: none;
+          color: var(--primary-color);
+          font-weight: 600;
+          font-size: 11px;
+          cursor: pointer;
+          align-self: flex-start;
+          padding: 2px 0;
+        }
+
+        .mark-single-read-btn:hover {
+          text-decoration: underline;
+        }
+
         .delete-notif-btn {
           position: absolute;
           top: 16px;
@@ -251,6 +401,11 @@ export function NotificationsClientView({
           }
           .notif-time {
             margin-top: 1px;
+          }
+          .header-actions {
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
           }
         }
       `}</style>

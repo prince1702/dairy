@@ -33,6 +33,10 @@ export function SubscriptionClientView({
 }: SubscriptionClientViewProps) {
   const router = useRouter();
 
+  // Search & Category Filters state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("ALL");
+
   // Quantities state
   const [subQuantities, setSubQuantities] = useState<Record<string, number>>(() => {
     const quantities: Record<string, number> = {};
@@ -46,7 +50,10 @@ export function SubscriptionClientView({
   const [subSubmitting, setSubSubmitting] = useState(false);
   const [subSuccess, setSubSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-  const [scheduleFilter, setScheduleFilter] = useState<"ALL" | "MORNING" | "EVENING">("ALL");
+
+  // Floating label active states
+  const [isNoteActive, setIsNoteActive] = useState(false);
+  const [specialNote, setSpecialNote] = useState("");
 
   const handleQtyChange = (productId: string, val: number) => {
     setSubQuantities((prev) => ({
@@ -82,22 +89,18 @@ export function SubscriptionClientView({
     }
   };
 
-  // Classify products into schedules based on category
-  const getProductSchedule = (product: Product) => {
-    const cat = product.category.toLowerCase();
-    if (cat.includes("milk") || cat.includes("dairy") || cat.includes("bread") || cat.includes("egg")) {
-      return "MORNING";
-    }
-    return "EVENING";
-  };
+  // Get unique categories list
+  const categories = ["ALL", ...Array.from(new Set(products.map((p) => p.category)))];
 
-  // Filter products based on selected schedule tabs
+  // Filter products by category & search query
   const filteredProducts = products.filter((p) => {
-    if (scheduleFilter === "ALL") return true;
-    return getProductSchedule(p) === scheduleFilter;
+    const matchesCategory = selectedCategory === "ALL" || p.category === selectedCategory;
+    const matchesSearch =
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.category.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
   });
 
-  // Calculate live daily preview cost
   const previewItems = products
     .map((p) => ({
       ...p,
@@ -108,79 +111,79 @@ export function SubscriptionClientView({
   const totalDailyCost = previewItems.reduce((sum, p) => sum + p.price * p.qty, 0);
 
   return (
-    <div className="subscription-container">
-      <div className="subscription-grid">
-        {/* Main Product Selector Form */}
-        <div className="products-selection-panel card">
+    <div className="subscription-wrapper">
+      <div className="subscription-grid-layout">
+        {/* Left Side: Product catalog selector */}
+        <div className="catalog-panel card">
           <div className="panel-header">
             <h3>Modify Recurring Delivery Schedule</h3>
-            <p className="text-muted">Select your baseline daily products and modify their quantities.</p>
+            <p className="text-muted">Search products and choose the baseline quantity to be delivered to your door daily.</p>
           </div>
 
-          {/* Schedule Filtering Tabs */}
-          <div className="schedule-tabs">
-            <button
-              className={`tab-btn ${scheduleFilter === "ALL" ? "active" : ""}`}
-              onClick={() => setScheduleFilter("ALL")}
-            >
-              📅 All Schedule
-            </button>
-            <button
-              className={`tab-btn ${scheduleFilter === "MORNING" ? "active" : ""}`}
-              onClick={() => setScheduleFilter("MORNING")}
-            >
-              🥛 Morning (5 AM - 7 AM)
-            </button>
-            <button
-              className={`tab-btn ${scheduleFilter === "EVENING" ? "active" : ""}`}
-              onClick={() => setScheduleFilter("EVENING")}
-            >
-              🧀 Evening (5 PM - 7 PM)
-            </button>
+          {/* Search bar & Categories Row */}
+          <div className="catalog-filters-row">
+            <div className="search-box">
+              <input
+                type="text"
+                placeholder="Search catalog..."
+                className="form-input"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="category-scroll-container">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  className={`category-tag-btn ${selectedCategory === cat ? "active" : ""}`}
+                  onClick={() => setSelectedCategory(cat)}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {errorMsg && <div className="badge badge-danger mb-4 block-alert">{errorMsg}</div>}
-          {subSuccess && <div className="badge badge-success mb-4 block-alert">Baseline subscription updated successfully!</div>}
+          {errorMsg && <div className="badge badge-danger mb-4 block-alert animation-shake">{errorMsg}</div>}
+          {subSuccess && <div className="badge badge-success mb-4 block-alert animation-bounce">✓ Baseline subscription updated successfully!</div>}
 
           <form onSubmit={handleSubSubmit}>
-            <div className="products-list-wrapper">
+            {/* Products grid cards */}
+            <div className="products-grid-catalog mt-4">
               {filteredProducts.length === 0 ? (
-                <div className="no-products text-muted text-center py-6">
-                  No products available in this category.
+                <div className="empty-catalog text-muted py-8 text-center w-full">
+                  🔍 No products match your search.
                 </div>
               ) : (
                 filteredProducts.map((p) => {
-                  const schedule = getProductSchedule(p);
+                  const qty = subQuantities[p.id] || 0;
                   return (
-                    <div key={p.id} className="sub-product-row">
-                      <div className="product-info-col">
-                        <span className="emoji-avatar">{p.emoji}</span>
-                        <div>
-                          <strong className="product-name">{p.name}</strong>
-                          <div className="product-meta text-muted">
-                            {p.size} • ₹{p.price.toFixed(2)}
-                            <span className={`schedule-badge ${schedule.toLowerCase()}`}>
-                              {schedule === "MORNING" ? "Morning 🥛" : "Evening 🧀"}
-                            </span>
-                          </div>
-                        </div>
+                    <div key={p.id} className={`product-catalog-card ${qty > 0 ? "selected" : ""}`}>
+                      <span className="p-emoji-badge">{p.emoji}</span>
+                      <div className="p-card-details">
+                        <strong>{p.name}</strong>
+                        <span className="p-card-meta text-muted">
+                          {p.size} • ₹{p.price.toFixed(2)}
+                        </span>
                       </div>
-
-                      <div className="quantity-controller">
+                      <div className="catalog-qty-selector">
                         <button
                           type="button"
-                          className="qty-adjust-btn"
-                          onClick={() => handleQtyChange(p.id, subQuantities[p.id] - 1)}
+                          className="qty-adjust-icon-btn"
+                          onClick={() => handleQtyChange(p.id, qty - 1)}
                           disabled={subSubmitting}
+                          aria-label="Decrease quantity"
                         >
                           -
                         </button>
-                        <span className="qty-value-display">{subQuantities[p.id]}</span>
+                        <span className="qty-value-text">{qty}</span>
                         <button
                           type="button"
-                          className="qty-adjust-btn"
-                          onClick={() => handleQtyChange(p.id, subQuantities[p.id] + 1)}
+                          className="qty-adjust-icon-btn"
+                          onClick={() => handleQtyChange(p.id, qty + 1)}
                           disabled={subSubmitting}
+                          aria-label="Increase quantity"
                         >
                           +
                         </button>
@@ -191,31 +194,56 @@ export function SubscriptionClientView({
               )}
             </div>
 
-            <button type="submit" className="btn btn-primary w-full mt-6" disabled={subSubmitting}>
-              {subSubmitting ? "Saving Baseline..." : "Save Baseline Schedule"}
+            {/* Simulated Floating Label Field for Delivery Notes */}
+            <div className={`floating-form-group mt-6 ${isNoteActive || specialNote ? "focused" : ""}`}>
+              <label className="floating-label" htmlFor="delivery-notes">
+                Special Delivery Instructions (Optional)
+              </label>
+              <input
+                id="delivery-notes"
+                type="text"
+                className="form-input floating-input"
+                value={specialNote}
+                onChange={(e) => {
+                  if (e.target.value.length <= 100) setSpecialNote(e.target.value);
+                }}
+                onFocus={() => setIsNoteActive(true)}
+                onBlur={() => setIsNoteActive(false)}
+                disabled={subSubmitting}
+              />
+              <span className="char-counter text-muted">{specialNote.length}/100</span>
+            </div>
+
+            <button type="submit" className="btn btn-primary w-full mt-6 loading-btn-parent" disabled={subSubmitting}>
+              {subSubmitting ? (
+                <>
+                  <span className="spinner"></span>
+                  Saving Schedule Changes...
+                </>
+              ) : (
+                "Save Baseline Schedule"
+              )}
             </button>
           </form>
         </div>
 
-        {/* Subscription Preview Panel */}
-        <div className="subscription-preview-panel card">
+        {/* Right Side: Subscription Preview Panel */}
+        <div className="preview-panel card">
           <h3>Subscription Preview</h3>
-          <p className="text-muted">What your recurring daily delivery and wallet deduction will look like.</p>
+          <p className="text-muted">A clear receipt showing your daily and monthly wallet deductions.</p>
 
-          <div className="preview-receipt-box">
+          <div className="receipt-container mt-6">
             {previewItems.length === 0 ? (
-              <div className="empty-preview text-center py-6 text-muted">
-                🛒 Select quantities on the left to preview your subscription.
+              <div className="empty-receipt text-center py-8 text-muted">
+                🛒 Add products to your daily schedule on the left to see the receipt breakdown.
               </div>
             ) : (
-              <div className="preview-active-list">
-                <div className="preview-section-title">DAILY ITEMS</div>
-                <div className="preview-items-list">
+              <div className="active-receipt">
+                <div className="receipt-title">Daily Order Shell</div>
+                <div className="receipt-list">
                   {previewItems.map((item) => (
-                    <div key={item.id} className="preview-item-row">
-                      <span>
-                        {item.emoji} {item.name} ({item.size})
-                      </span>
+                    <div key={item.id} className="receipt-item">
+                      <span>{item.emoji} {item.name} ({item.size})</span>
                       <strong>
                         {item.qty} x ₹{item.price.toFixed(2)}
                       </strong>
@@ -223,11 +251,11 @@ export function SubscriptionClientView({
                   ))}
                 </div>
 
-                <div className="preview-divider"></div>
+                <div className="receipt-divider"></div>
 
-                <div className="preview-summary-footer">
+                <div className="receipt-summary">
                   <div className="summary-row font-large">
-                    <span>Est. Daily Total Cost:</span>
+                    <span>Daily Total Cost:</span>
                     <strong>₹{totalDailyCost.toFixed(2)}</strong>
                   </div>
                   <div className="summary-row font-large">
@@ -236,8 +264,8 @@ export function SubscriptionClientView({
                   </div>
                 </div>
 
-                <div className="info-box-alert">
-                  💡 <strong>How it works:</strong> This is your default daily delivery list. These products will arrive silently at your address every morning. You can toggle pauses or overrides under "Tomorrow Changes" whenever you want.
+                <div className="receipt-info-alert">
+                  💡 <strong>Auto-Billing:</strong> These baseline products will arrive automatically at your address. Adjust overrides under "Tomorrow Changes" whenever you want to pause/change for tomorrow without touching this baseline.
                 </div>
               </div>
             )}
@@ -245,15 +273,14 @@ export function SubscriptionClientView({
         </div>
       </div>
 
-      {/* Local styles */}
       <style jsx>{`
-        .subscription-container {
+        .subscription-wrapper {
           display: flex;
           flex-direction: column;
           gap: 24px;
         }
 
-        .subscription-grid {
+        .subscription-grid-layout {
           display: grid;
           grid-template-columns: 1.5fr 1fr;
           gap: 32px;
@@ -261,204 +288,270 @@ export function SubscriptionClientView({
         }
 
         .panel-header {
-          margin-bottom: 24px;
+          margin-bottom: 20px;
         }
 
-        .schedule-tabs {
+        /* Filter header styling */
+        .catalog-filters-row {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          border-bottom: 1px solid var(--border-color);
+          padding-bottom: 16px;
+          margin-bottom: 16px;
+        }
+
+        .category-scroll-container {
           display: flex;
           gap: 8px;
-          margin-bottom: 24px;
-          border-bottom: 1px solid var(--border-color);
-          padding-bottom: 12px;
+          overflow-x: auto;
+          padding-bottom: 4px;
+          -scrollbar-width: none;
         }
 
-        .tab-btn {
-          padding: 8px 16px;
-          background: transparent;
+        .category-scroll-container::-webkit-scrollbar {
+          display: none;
+        }
+
+        .category-tag-btn {
+          padding: 6px 12px;
+          background: var(--border-light);
           border: 1px solid var(--border-color);
-          color: var(--text-muted);
-          border-radius: 8px;
-          cursor: pointer;
-          font-size: 13px;
+          border-radius: 20px;
+          font-size: 12px;
           font-weight: 500;
+          color: var(--text-muted);
+          cursor: pointer;
+          white-space: nowrap;
           transition: all 0.2s;
         }
 
-        .tab-btn:hover {
-          background: var(--border-light);
+        .category-tag-btn:hover {
+          background: var(--border-color);
           color: var(--text-main);
         }
 
-        .tab-btn.active {
-          background: var(--primary-light);
-          color: var(--primary-color);
+        .category-tag-btn.active {
+          background: var(--primary-color);
+          color: white;
           border-color: var(--primary-color);
-          font-weight: 600;
         }
 
-        .products-list-wrapper {
-          display: flex;
-          flex-direction: column;
+        /* Catalog grid cards */
+        .products-grid-catalog {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
           gap: 16px;
-          max-height: 550px;
+          max-height: 500px;
           overflow-y: auto;
           padding-right: 4px;
         }
 
-        .sub-product-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding-bottom: 16px;
-          border-bottom: 1px solid var(--border-light);
-        }
-
-        .sub-product-row:last-child {
-          border-bottom: none;
-          padding-bottom: 0;
-        }
-
-        .product-info-col {
+        .product-catalog-card {
+          border: 1px solid var(--border-color);
+          border-radius: 12px;
+          padding: 16px;
           display: flex;
           align-items: center;
-          gap: 16px;
+          gap: 12px;
+          background: var(--bg-card);
+          transition: all 0.2s;
         }
 
-        .emoji-avatar {
-          font-size: 26px;
+        .product-catalog-card.selected {
+          border-color: var(--primary-color);
+          background: var(--primary-light);
+          box-shadow: 0 4px 8px var(--shadow-color);
+        }
+
+        .p-emoji-badge {
+          font-size: 24px;
+          width: 42px;
+          height: 42px;
           background: var(--border-light);
-          width: 48px;
-          height: 48px;
+          border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
-          border-radius: 50%;
+          flex-shrink: 0;
         }
 
-        .product-name {
-          font-size: 15px;
+        .p-card-details {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          min-width: 0;
+          flex: 1;
+        }
+
+        .p-card-details strong {
+          font-size: 14px;
           color: var(--text-main);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
-        .product-meta {
-          font-size: 13px;
+        .p-card-meta {
+          font-size: 12px;
+        }
+
+        .catalog-qty-selector {
           display: flex;
           align-items: center;
           gap: 8px;
-          margin-top: 2px;
-        }
-
-        .schedule-badge {
-          font-size: 10px;
-          font-weight: bold;
-          padding: 1px 6px;
-          border-radius: 4px;
-          text-transform: uppercase;
-        }
-
-        .schedule-badge.morning {
-          background: var(--primary-light);
-          color: var(--primary-color);
-        }
-
-        .schedule-badge.evening {
-          background: var(--accent-light);
-          color: var(--accent-color);
-        }
-
-        .quantity-controller {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          border: 1px solid var(--border-color);
+          background: var(--border-light);
+          padding: 2px;
           border-radius: 8px;
-          padding: 4px;
-          background: var(--bg-app);
+          border: 1px solid var(--border-color);
         }
 
-        .qty-adjust-btn {
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          border: none;
+        .qty-adjust-icon-btn {
+          width: 26px;
+          height: 26px;
           background: var(--bg-card);
+          border: none;
           color: var(--text-main);
-          font-weight: bold;
+          border-radius: 6px;
           cursor: pointer;
+          font-weight: bold;
           display: flex;
           align-items: center;
           justify-content: center;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-          transition: background 0.2s;
         }
 
-        .qty-adjust-btn:hover:not(:disabled) {
+        .qty-adjust-icon-btn:hover {
           background: var(--primary-light);
           color: var(--primary-color);
         }
 
-        .qty-adjust-btn:disabled {
+        .qty-adjust-icon-btn:disabled {
           opacity: 0.5;
-          cursor: not-allowed;
         }
 
-        .qty-value-display {
+        .qty-value-text {
+          font-size: 13px;
           font-weight: 600;
-          width: 24px;
+          width: 16px;
           text-align: center;
         }
 
-        /* Preview Panel */
-        .preview-receipt-box {
-          margin-top: 20px;
-          background: var(--border-light);
-          padding: 20px;
-          border-radius: 8px;
-          border: 1px solid var(--border-color);
+        /* Floating label styles */
+        .floating-form-group {
+          position: relative;
+          margin-top: 24px;
         }
 
-        .preview-active-list {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-
-        .preview-section-title {
-          font-size: 11px;
-          font-weight: bold;
+        .floating-label {
+          position: absolute;
+          left: 16px;
+          top: 12px;
+          font-size: 14px;
           color: var(--text-muted);
-          letter-spacing: 0.05em;
-          border-bottom: 1px solid var(--border-color);
+          pointer-events: none;
+          transition: transform 0.2s, font-size 0.2s, color 0.2s;
+        }
+
+        .floating-input {
+          padding-top: 18px;
           padding-bottom: 6px;
         }
 
-        .preview-items-list {
+        .floating-form-group.focused .floating-label,
+        .floating-form-group.focused .floating-input:not([value=""]) + .floating-label {
+          transform: translateY(-8px) scale(0.85);
+          transform-origin: top left;
+          color: var(--primary-color);
+        }
+
+        .char-counter {
+          position: absolute;
+          right: 12px;
+          bottom: 10px;
+          font-size: 11px;
+        }
+
+        /* Loader Button styling */
+        .loading-btn-parent {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+        }
+
+        .spinner {
+          width: 16px;
+          height: 16px;
+          border: 2px solid white;
+          border-top-color: transparent;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+
+        /* Animation validation */
+        .animation-shake {
+          animation: shake 0.4s ease;
+        }
+
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-4px); }
+          75% { transform: translateX(4px); }
+        }
+
+        .animation-bounce {
+          animation: bounce 0.4s ease;
+        }
+
+        @keyframes bounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-4px); }
+        }
+
+        /* Receipt styling */
+        .receipt-container {
+          background: var(--border-light);
+          border: 1px solid var(--border-color);
+          padding: 24px;
+          border-radius: 12px;
+        }
+
+        .receipt-title {
+          font-size: 11px;
+          font-weight: 700;
+          color: var(--text-muted);
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          border-bottom: 1px solid var(--border-color);
+          padding-bottom: 8px;
+          margin-bottom: 16px;
+        }
+
+        .receipt-list {
           display: flex;
           flex-direction: column;
           gap: 12px;
         }
 
-        .preview-item-row {
+        .receipt-item {
           display: flex;
           justify-content: space-between;
           font-size: 14px;
         }
 
-        .preview-divider {
+        .receipt-divider {
           border-top: 1px dashed var(--border-color);
-          margin: 8px 0;
-        }
-
-        .preview-summary-footer {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
+          margin: 16px 0;
         }
 
         .summary-row {
           display: flex;
           justify-content: space-between;
-          font-size: 14px;
+          margin-top: 8px;
         }
 
         .summary-row.font-large {
@@ -467,15 +560,14 @@ export function SubscriptionClientView({
           color: var(--text-main);
         }
 
-        .info-box-alert {
-          margin-top: 16px;
+        .receipt-info-alert {
+          margin-top: 20px;
           background: var(--bg-card);
+          padding: 16px;
+          border-radius: 8px;
           border-left: 4px solid var(--primary-color);
-          padding: 12px;
-          border-radius: 6px;
           font-size: 12px;
           line-height: 1.5;
-          color: var(--text-muted);
         }
 
         .block-alert {
@@ -489,7 +581,13 @@ export function SubscriptionClientView({
         }
 
         @media (max-width: 900px) {
-          .subscription-grid {
+          .subscription-grid-layout {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        @media (max-width: 600px) {
+          .products-grid-catalog {
             grid-template-columns: 1fr;
           }
         }

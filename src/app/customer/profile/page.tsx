@@ -30,6 +30,13 @@ export default async function CustomerProfilePage() {
     redirect("/login?error=Unauthorized");
   }
 
+  // Fetch subscription audit logs (recent activity timeline)
+  const auditLogs = await prisma.subscriptionAuditLog.findMany({
+    where: { customerId },
+    orderBy: { timestamp: "desc" },
+    take: 10,
+  });
+
   return (
     <ProfileClientView
       customer={{
@@ -39,6 +46,12 @@ export default async function CustomerProfilePage() {
         phone: customer.phone || "",
         address: customer.address || "",
       }}
+      auditLogs={auditLogs.map((log) => ({
+        id: log.id,
+        actionType: log.actionType,
+        details: log.details,
+        timestamp: log.timestamp.toISOString(),
+      }))}
     />
   );
 }

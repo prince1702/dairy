@@ -142,10 +142,30 @@ export default async function CustomerDashboardPage() {
     take: 5,
   });
 
-  // Fetch all product details for mapping
+  // 10. Fetch all product details for mapping
   const products = await prisma.product.findMany({
     where: { available: true },
     select: { id: true, name: true, emoji: true, category: true, price: true, size: true },
+  });
+
+  // NEW PHASE 2 METRICS
+  // A. Total deliveries count
+  const totalDeliveriesCount = await prisma.delivery.count({
+    where: { customerId },
+  });
+
+  // B. Next upcoming vacation
+  const upcomingVacation = await prisma.vacation.findFirst({
+    where: {
+      customerId,
+      endDate: { gte: new Date() },
+    },
+    orderBy: { startDate: "asc" },
+  });
+
+  // C. Unread notifications count
+  const unreadNotificationsCount = await prisma.notification.count({
+    where: { recipientId: customerId, isRead: false },
   });
 
   return (
@@ -170,6 +190,13 @@ export default async function CustomerDashboardPage() {
       notifications={notifications}
       deliveries={deliveries}
       products={products}
+      // Phase 2 props
+      totalDeliveriesCount={totalDeliveriesCount}
+      upcomingVacation={upcomingVacation ? {
+        startDate: upcomingVacation.startDate.toISOString(),
+        endDate: upcomingVacation.endDate.toISOString(),
+      } : null}
+      unreadNotificationsCount={unreadNotificationsCount}
     />
   );
 }
